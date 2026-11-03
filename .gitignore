@@ -1,4 +1,5 @@
 node_modules/
 session/
 .env
+set.env
 *.log
