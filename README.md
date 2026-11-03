@@ -19,7 +19,7 @@
 - Modular command handler
 - Public and private operating modes (public users share the one connected bot account)
 - Group protection hooks
-- Status auto-view, auto-read, incoming-call rejection, and always-online controls
+- Status auto-view, auto-read, incoming-call rejection, always-online, and owner-only anti-delete text alerts
 - Optional MongoDB-backed session persistence
 - Lightweight HTTP health and pairing server
 
@@ -46,6 +46,7 @@ For local use, copy `set.env.example` to `set.env` and fill in your private valu
 | `AUTO_VIEW_STATUS` | Automatically view status updates | `true` |
 | `AUTO_READ` | Automatically mark incoming messages as read | `false` |
 | `ANTI_CALL` | Automatically reject incoming WhatsApp calls | `false` |
+| `ANTI_DELETE` | Enable owner alerts for deleted incoming text messages | `false` |
 | `ALWAYS_ONLINE` | Keep WhatsApp presence marked online while connected | `false` |
 | `TIMEZONE` | Time zone for connection alerts | `Africa/Nairobi` |
 
@@ -60,7 +61,7 @@ npm start
 
 Open `/pair` on the running service to use the pairing page. You can also configure `PAIRING_NUMBER` to request a pairing code on startup. After linking, the bot sends a session ID to the linked WhatsApp account. Keep that ID private.
 
-Send `.menu` in WhatsApp to check the command menu. After linking, bot controls are WhatsApp commands (not a separate dashboard): `.autoviewstatus on|off`, `.autoread on|off`, and `.anticall on|off`, and `.alwaysonline on|off` are owner-only settings. Group admins can use `.guard` and the group protection commands inside their groups.
+Send `.menu` in WhatsApp to check the command menu. After linking, bot controls are WhatsApp commands (not a separate dashboard): `.autoviewstatus on|off`, `.autoread on|off`, `.anticall on|off`, `.antidelete on|off`, and `.alwaysonline on|off` are owner-only settings. Anti-delete reports cached text to the configured owner; it does not recover or forward media. Group admins can use `.guard` and the group protection commands inside their groups.
 
 ## WhatsApp account model
 
