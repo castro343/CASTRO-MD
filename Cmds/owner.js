@@ -142,7 +142,7 @@ module.exports = [
     run: async ({ reply, args, settings, prefix }) => {
       const v = (args[0] || '').toLowerCase();
       if (!['on', 'off'].includes(v)) {
-        return reply(`Auto read is ${settings.autoRead ? 'ON' : 'OFF'}.\\nUse: ${prefix}autoread on|off`);
+        return reply(`Auto read is ${settings.autoRead ? 'ON' : 'OFF'}.\nUse: ${prefix}autoread on|off`);
       }
       settings.autoRead = v === 'on';
       if (!store.save(settings)) {
