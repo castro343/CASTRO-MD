@@ -31,7 +31,7 @@
 
 ## Configuration
 
-Set environment variables in your hosting provider or in a local `set.env` file.
+For local use, copy `set.env.example` to `set.env` and fill in your private values. On Render, add the same values in the service environment settings. Do not commit `set.env`.
 
 | Variable | Description | Default |
 | --- | --- | --- |
