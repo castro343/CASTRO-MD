@@ -1,7 +1,7 @@
 {
-  "name": "nexus-bot",
+  "name": "castro-md",
   "version": "1.0.0",
-  "description": "Nexus - a simple, modular WhatsApp bot",
+  "description": "CASTRO-MD - a modular WhatsApp automation bot",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
