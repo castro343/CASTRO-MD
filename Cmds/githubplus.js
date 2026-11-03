@@ -4,7 +4,7 @@
 const path = require('path');
 const { kv, numbered } = require('../lib/table');
 
-const DEFAULT_REPO = 'adeztech2/nexus'; // used when no repo is given (or set it with the owner command seturl)
+const DEFAULT_REPO = 'castro343/CASTRO-MD'; // used when no repo is given (or set it with the owner command seturl)
 const CACHE_MS = 5 * 60 * 1000;
 const COOLDOWN_MS = 2000;
 const TEXT_LIMIT = 2500; // longer files are sent as a document instead
@@ -20,7 +20,7 @@ async function api(pathOrUrl, { raw = false } = {}) {
   const hit = cache.get(key);
   if (hit && Date.now() - hit.at < CACHE_MS) return hit.body;
 
-  const headers = { 'user-agent': 'nexus-bot', accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json' };
+  const headers = { 'user-agent': 'castro-md', accept: raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json' };
   if (process.env.GITHUB_TOKEN) headers.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   const res = await fetch(url, { headers, signal: AbortSignal.timeout(20000) });
   if (!res.ok) {
