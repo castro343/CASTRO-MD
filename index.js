@@ -236,6 +236,20 @@ async function start() {
   sock.ev.on('creds.update', saveCreds);
 
   // Group protection: welcome/goodbye messages, ban list, country filter.
+  // Reject incoming calls only when the owner has explicitly enabled anti-call.
+  sock.ev.on('call', async (calls) => {
+    if (!settings.antiCall || shuttingDown) return;
+    for (const call of calls || []) {
+      if (call.status !== 'offer' || !call.id || !call.from) continue;
+      try {
+        await sock.rejectCall(call.id, call.from);
+        log.info(`Rejected incoming ${call.isVideo ? 'video' : 'voice'} call from ${call.from}`);
+      } catch (e) {
+        log.warn(`Could not reject incoming call from ${call.from}: ${e.message}`);
+      }
+    }
+  });
+
   sock.ev.on('group-participants.update', (update) => {
     guard.onParticipants(sock, update).catch((e) => log.error('Guard (members) error:', e));
   });
