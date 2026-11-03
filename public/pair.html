@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#080b12">
+  <title>CASTRO-MD | Pair WhatsApp</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080b12;--panel:#111722;--gold:#d9ad4b;--blue:#28a9ff;--muted:#9aa7b8}
+    *{box-sizing:border-box}
+    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 15% 10%,#142c45 0,transparent 42%),radial-gradient(ellipse at 90% 85%,#342713 0,transparent 35%),var(--bg);font-family:Inter,system-ui,Arial,sans-serif;color:#f5f7fb}
+    .card{width:min(100%,460px);padding:34px;border:1px solid #293448;border-radius:24px;background:linear-gradient(145deg,rgba(20,29,43,.97),rgba(10,14,22,.97));box-shadow:0 24px 90px #0009}
+    .mark{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(135deg,var(--gold),#7c5a20);color:#080b12;font-weight:950;font-size:25px;box-shadow:0 0 30px #d9ad4b33}
+    h1{margin:22px 0 7px;font-size:29px;letter-spacing:.08em}
+    .sub{margin:0 0 26px;color:var(--muted);line-height:1.6}
+    label{display:block;margin:0 0 9px;font-size:13px;font-weight:700;color:#dce5f2}
+    input{width:100%;padding:15px 16px;border:1px solid #34445a;border-radius:12px;background:#080e18;color:white;font-size:16px;outline:none}
+    input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #28a9ff20}
+    button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:12px;background:linear-gradient(100deg,var(--gold),#f1d58b);color:#17120a;font-weight:900;font-size:15px;cursor:pointer}
+    button:disabled{opacity:.55;cursor:wait}
+    .result{display:none;margin-top:20px;padding:18px;border:1px solid #24527a;border-radius:14px;background:#0b1c2b}
+    .code{margin:8px 0;color:#7bcaff;font-size:27px;font-weight:900;letter-spacing:.14em;text-align:center;overflow-wrap:anywhere}
+    .hint,.foot{font-size:12px;line-height:1.6;color:var(--muted)}
+    .error{margin-top:14px;color:#ff8b8b;font-size:13px}
+    .foot{margin-top:24px;text-align:center}
+  </style>
+</head>
+<body>
+  <main class="card">
+    <div class="mark">C</div>
+    <h1>CASTRO-MD</h1>
+    <p class="sub">Securely link your WhatsApp account using a pairing code.</p>
+    <form id="pairForm">
+      <label for="number">WhatsApp number with country code</label>
+      <input id="number" name="number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="2547XXXXXXXX" required minlength="8" maxlength="15">
+      <button id="submit" type="submit">GENERATE PAIRING CODE</button>
+      <div class="error" id="error" role="alert"></div>
+    </form>
+    <section class="result" id="result" aria-live="polite">
+      <div class="hint">Your WhatsApp pairing code</div>
+      <div class="code" id="code"></div>
+      <div class="hint">On WhatsApp, open Linked devices → Link a device → Link with phone number, then enter this code. Keep the code and the session ID private.</div>
+    </section>
+    <p class="foot">BLACK • GOLD • ELECTRIC BLUE<br>Powered by Castro</p>
+  </main>
+  <script>
+    const form=document.getElementById('pairForm');
+    const button=document.getElementById('submit');
+    const error=document.getElementById('error');
+    const result=document.getElementById('result');
+    form.addEventListener('submit',async event=>{
+      event.preventDefault();
+      const number=document.getElementById('number').value.replace(/\D/g,'');
+      error.textContent='';result.style.display='none';
+      if(number.length<8||number.length>15){error.textContent='Enter a valid number with country code.';return;}
+      button.disabled=true;button.textContent='REQUESTING CODE…';
+      try{
+        const response=await fetch('/api/pair?number='+encodeURIComponent(number));
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.error||'Pairing request failed.');
+        document.getElementById('code').textContent=data.code;
+        result.style.display='block';
+      }catch(err){error.textContent=err.message||'Could not reach the pairing service. Try again.';}
+      finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE';}
+    });
+  </script>
+</body>
+</html>
