@@ -1,28 +1,29 @@
 {
-  "name": "Nexus",
-  "description": "Nexus WhatsApp bot by Arnold Adez (ADEZ TECH)",
-  "repository": "https://github.com/adeztech2/nexus",
+  "name": "CASTRO-MD",
+  "description": "CASTRO-MD WhatsApp automation bot by Castro",
+  "repository": "https://github.com/castro343/CASTRO-MD",
   "keywords": [
     "whatsapp",
     "bot",
-    "nodejs"
+    "nodejs",
+    "castro-md"
   ],
   "stack": "container",
   "env": {
     "SESSION_ID": {
-      "description": "Session ID from the /pair page (starts with NEXUS~)",
-      "required": true
+      "description": "Session ID from the /pair page (starts with CASTRO-MD~)",
+      "required": false
     },
     "OWNER_NUMBER": {
-      "description": "Extra owner numbers (digits only). Arnold Adez 254111783552 is always the main owner.",
-      "value": "254111783552",
+      "description": "Additional owner numbers (digits only, country code included). Castro is the primary owner.",
+      "value": "254739082713",
       "required": false
     },
     "SESSION_DIR": {
       "value": "/tmp/session"
     },
     "BOT_NAME": {
-      "value": "Nexus"
+      "value": "CASTRO-MD"
     },
     "PREFIX": {
       "value": "."
