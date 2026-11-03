@@ -23,6 +23,7 @@ module.exports = {
   repo: process.env.REPO_URL || 'https://github.com/castro343/CASTRO-MD',
   autoRead: String(process.env.AUTO_READ || 'false') === 'true',
   antiCall: String(process.env.ANTI_CALL || 'false') === 'true',
+  alwaysOnline: String(process.env.ALWAYS_ONLINE || 'false') === 'true',
   autoViewStatus: String(process.env.AUTO_VIEW_STATUS || 'true') !== 'false',
   mongoUri: (process.env.MONGODB_URI || '').trim(),
   mongoDb: process.env.MONGODB_DB || 'castro_md',
