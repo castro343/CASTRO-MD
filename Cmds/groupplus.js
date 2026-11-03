@@ -34,8 +34,8 @@ module.exports = [
     ].join('\n'));
   }),
 
-  A('antilink', 'Toggle WhatsApp link protection', async ({ args, reply, prefix }) => {
-    const g = group(arguments[0]?.from);
+  A('antilink', 'Toggle WhatsApp link protection', async ({ from, args, reply, prefix }) => {
+    const g = group(from);
     const value = String(args[0] || '').toLowerCase();
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}antilink on|off`);
     g.antilink.on = value === 'on';
