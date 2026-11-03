@@ -2,12 +2,12 @@
 // Optional: set GITHUB_TOKEN in the server environment to avoid GitHub's rate limit.
 const { kv, numbered } = require('../lib/table');
 
-const DEFAULT_REPO = 'adeztech2/nexus'; // used when no repo is given (or set settings.repo)
+const DEFAULT_REPO = 'castro343/CASTRO-MD'; // used when no repo is given (or set settings.repo)
 const MAX_MB = 60;
 const MAX_BYTES = MAX_MB * 1024 * 1024;
 
 const headers = () => {
-  const h = { 'user-agent': 'nexus-bot', accept: 'application/vnd.github+json' };
+  const h = { 'user-agent': 'castro-md', accept: 'application/vnd.github+json' };
   if (process.env.GITHUB_TOKEN) h.authorization = `Bearer ${process.env.GITHUB_TOKEN}`;
   return h;
 };
