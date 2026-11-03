@@ -30,5 +30,7 @@ services:
         value: "false"
       - key: ANTI_CALL
         value: "false"
+      - key: ANTI_DELETE
+        value: "false"
       - key: ALWAYS_ONLINE
         value: "false"
