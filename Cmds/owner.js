@@ -147,7 +147,10 @@ module.exports = [
     description: 'Restart the bot process',
     ownerOnly: true,
     run: async ({ reply }) => {
-      await reply('🔄 Restart requested. The hosting platform must restart the process.');
+      await reply('🔄 CASTRO-MD is restarting now. Give it a moment to reconnect.');
+      // Let the WhatsApp reply leave the process before asking the host/process manager
+      // to restart us. SIGTERM also gives the guard module a chance to flush its data.
+      setTimeout(() => process.kill(process.pid, 'SIGTERM'), 1200);
     },
   },
 ];
