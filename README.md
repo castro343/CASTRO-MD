@@ -19,7 +19,7 @@
 - Modular command handler
 - Public and private operating modes (public users share the one connected bot account)
 - Group protection hooks
-- Status auto-view and auto-read controls
+- Status auto-view, auto-read, and incoming-call rejection controls
 - Optional MongoDB-backed session persistence
 - Lightweight HTTP health and pairing server
 
@@ -45,6 +45,7 @@ For local use, copy `set.env.example` to `set.env` and fill in your private valu
 | `MONGODB_DB` | MongoDB database name | `castro_md` |
 | `AUTO_VIEW_STATUS` | Automatically view status updates | `true` |
 | `AUTO_READ` | Automatically mark incoming messages as read | `false` |
+| `ANTI_CALL` | Automatically reject incoming WhatsApp calls | `false` |
 | `TIMEZONE` | Time zone for connection alerts | `Africa/Nairobi` |
 
 The primary owner is configured as Castro. The default owner number is set in `settings.js`; additional owners can be supplied with `OWNER_NUMBER`.
@@ -58,7 +59,7 @@ npm start
 
 Open `/pair` on the running service to use the pairing page. You can also configure `PAIRING_NUMBER` to request a pairing code on startup. After linking, the bot sends a session ID to the linked WhatsApp account. Keep that ID private.
 
-Send `.menu` in WhatsApp to check the command menu.
+Send `.menu` in WhatsApp to check the command menu. After linking, bot controls are WhatsApp commands (not a separate dashboard): `.autoviewstatus on|off`, `.autoread on|off`, and `.anticall on|off` are owner-only settings. Group admins can use `.guard` and the group protection commands inside their groups.
 
 ## WhatsApp account model
 
