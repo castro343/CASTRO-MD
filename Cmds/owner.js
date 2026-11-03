@@ -160,7 +160,7 @@ module.exports = [
     run: async ({ reply, args, settings, prefix }) => {
       const value = String(args[0] || '').toLowerCase();
       if (!['on', 'off'].includes(value)) {
-        return reply(`Anti-call is ${settings.antiCall ? 'ON' : 'OFF'}.\\nUse: ${prefix}anticall on|off`);
+        return reply(`Anti-call is ${settings.antiCall ? 'ON' : 'OFF'}.\nUse: ${prefix}anticall on|off`);
       }
       settings.antiCall = value === 'on';
       if (!store.save(settings)) {
