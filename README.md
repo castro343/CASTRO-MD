@@ -17,7 +17,7 @@
 - WhatsApp pairing-code and QR login
 - Session ID export and restoration
 - Modular command handler
-- Public and private operating modes
+- Public and private operating modes (public users share the one connected bot account)
 - Group protection hooks
 - Status auto-view and auto-read controls
 - Optional MongoDB-backed session persistence
@@ -59,6 +59,12 @@ npm start
 Open `/pair` on the running service to use the pairing page. You can also configure `PAIRING_NUMBER` to request a pairing code on startup. After linking, the bot sends a session ID to the linked WhatsApp account. Keep that ID private.
 
 Send `.menu` in WhatsApp to check the command menu.
+
+## WhatsApp account model
+
+CASTRO-MD runs **one main WhatsApp session per deployment**. Public mode lets other people send commands to that connected account, subject to the bot's permissions and group rules. It does **not** let each user independently link a separate WhatsApp account to the same running bot. This single-session design is intentional: it keeps authentication, message handling, moderation state, and hosting simpler and avoids the reliability risks of managing several linked accounts in one process.
+
+If you deploy another independent copy, give it its own WhatsApp account, session storage, and hosting service. Do not point two running copies at the same session.
 
 ## Session storage
 
