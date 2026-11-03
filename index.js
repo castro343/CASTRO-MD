@@ -338,11 +338,11 @@ async function start() {
         }
         continue;
       }
-      // Cache received messages so a later revoke update can be matched.
-      cacheMessage(msg);
       // Accept live messages, plus your own recent messages synced from your phone.
       const age = Date.now() / 1000 - Number(String(msg.messageTimestamp || 0));
       if (type !== 'notify' && !(type === 'append' && msg.key.fromMe && age < 60)) continue;
+      // Cache only accepted live incoming messages so old history is not treated as current.
+      cacheMessage(msg);
       if (getText(msg.message).startsWith(settings.prefix)) {
         log.info(`[MSG] ${type} from=${msg.key.remoteJid} fromMe=${!!msg.key.fromMe} text="${getText(msg.message).slice(0, 40)}"`);
       }
