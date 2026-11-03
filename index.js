@@ -298,9 +298,10 @@ async function start() {
 
   // Short-lived cache for anti-delete text alerts. Media is intentionally not recovered or forwarded.
   const receivedCache = new Map();
+  const messageCacheKey = (key) => `${key?.remoteJid || ''}|${key?.id || ''}`;
   const cacheMessage = (msg) => {
     if (!msg?.key?.id || msg.key.fromMe || !msg.message || msg.key.remoteJid === 'status@broadcast') return;
-    receivedCache.set(msg.key.id, { msg, at: Date.now() });
+    receivedCache.set(messageCacheKey(msg.key), { msg, at: Date.now() });
     if (receivedCache.size > 1000) receivedCache.delete(receivedCache.keys().next().value);
   };
 
@@ -311,9 +312,9 @@ async function start() {
       const deletedKey = protocol?.key;
       // Baileys represents a revoke as protocolMessage type 0 (REVOKE).
       if (Number(protocol?.type) !== 0 || !deletedKey?.id) continue;
-      const cached = receivedCache.get(deletedKey.id);
+      const cached = receivedCache.get(messageCacheKey(deletedKey));
       if (!cached || Date.now() - cached.at > 24 * 60 * 60 * 1000) continue;
-      receivedCache.delete(deletedKey.id);
+      receivedCache.delete(messageCacheKey(deletedKey));
       const original = cached.msg;
       const body = getText(original.message) || '[No recoverable text; this may have been a media message.]';
       const notice =
