@@ -153,6 +153,24 @@ module.exports = [
     },
   },
   {
+    name: 'anticall',
+    aliases: ['autorejectcall', 'rejectcalls'],
+    description: 'Automatically reject incoming WhatsApp calls: anticall on|off',
+    ownerOnly: true,
+    run: async ({ reply, args, settings, prefix }) => {
+      const value = String(args[0] || '').toLowerCase();
+      if (!['on', 'off'].includes(value)) {
+        return reply(`Anti-call is ${settings.antiCall ? 'ON' : 'OFF'}.\\nUse: ${prefix}anticall on|off`);
+      }
+      settings.antiCall = value === 'on';
+      if (!store.save(settings)) {
+        await reply('⚠️ Anti-call changed for this run, but could not be saved. Check DATA_DIR permissions or persistent storage.');
+        return;
+      }
+      await reply(`✅ Anti-call turned ${value.toUpperCase()} and saved.`);
+    },
+  },
+  {
     name: 'runtime',
     aliases: ['uptime'],
     description: 'Show bot uptime',
