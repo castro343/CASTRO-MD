@@ -1,5 +1,7 @@
 'use strict';
 
+const store = require('../lib/store');
+
 // CASTRO-MD owner commands.
 
 module.exports = [
@@ -125,7 +127,11 @@ module.exports = [
         return reply(`Auto view status is ${settings.autoViewStatus ? 'ON' : 'OFF'}.\nUse: ${prefix}autoviewstatus on|off`);
       }
       settings.autoViewStatus = v === 'on';
-      await reply(`✅ Auto view status turned ${v.toUpperCase()}.`);
+      if (!store.save(settings)) {
+        await reply('⚠️ Auto view status changed for this run, but could not be saved. Check DATA_DIR permissions or persistent storage.');
+        return;
+      }
+      await reply(`✅ Auto view status turned ${v.toUpperCase()} and saved.`);
     },
   },
   {
