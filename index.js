@@ -36,6 +36,7 @@ let restoredFromEnv = false;
 const sentCache = new Map();
 let mongoLogged = false;
 let activeSocket = null;
+let activeCredentialsRegistered = false;
 let presenceTimer = null;
 let shuttingDown = false;
 
@@ -83,12 +84,12 @@ const server = http.createServer(async (req, res) => {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
       try {
-        const number = String(url.searchParams.get('number') || '').replace(/\\D/g, '');
+        const number = String(url.searchParams.get('number') || '').replace(/\D/g, '');
         if (number.length < 8 || number.length > 15) {
           return json(res, 400, { error: 'Enter your full WhatsApp number with country code.' });
         }
         if (!activeSocket) return json(res, 503, { error: 'WhatsApp is still starting. Wait a few seconds and retry.' });
-        if (activeSocket.authState?.creds?.registered || activeSocket.user) {
+        if (activeCredentialsRegistered || activeSocket.user) {
           return json(res, 409, { error: 'CASTRO-MD is already linked. You do not need to pair again.' });
         }
         const previous = pairingRequests.get(number) || 0;
@@ -175,6 +176,7 @@ async function start() {
   }
   if (!authStore) authStore = await useMultiFileAuthState(settings.sessionDir);
   const { state, saveCreds } = authStore;
+  activeCredentialsRegistered = !!state.creds.registered;
   // Never wait long for the version lookup: if it is slow, start with the version built into Baileys.
   const { version } = await Promise.race([
     fetchLatestBaileysVersion(),
@@ -254,6 +256,7 @@ async function start() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === 'open') {
+      activeCredentialsRegistered = true;
       log.info(`${settings.botName} connected as ${sock.user?.id}`);
       clearInterval(presenceTimer);
       if (settings.alwaysOnline) {
