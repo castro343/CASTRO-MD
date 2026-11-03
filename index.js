@@ -35,6 +35,8 @@ let restoredFromEnv = false;
 // (the "Waiting for this message" problem).
 const sentCache = new Map();
 let mongoLogged = false;
+let activeSocket = null;
+let shuttingDown = false;
 
 // Log in from SESSION_ID if provided (only when no local session exists yet).
 if (settings.sessionId && !fs.existsSync(path.join(settings.sessionDir, 'creds.json'))) {
@@ -61,8 +63,7 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
-http
-  .createServer(async (req, res) => {
+const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
     if (url.pathname === '/pair' || url.pathname === '/pair.html') {
@@ -89,8 +90,8 @@ http
 
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(`${settings.botName} is running`);
-  })
-  .listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
+  });
+server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
 
 // After the first successful link, DM the session ID to the linked account (once).
 async function sendSessionId(sock) {
@@ -207,6 +208,8 @@ async function start() {
     getMessage: async (key) => sentCache.get(key.id),
   });
 
+  activeSocket = sock;
+
   const origSend = sock.sendMessage.bind(sock);
   sock.sendMessage = async (...args) => {
     const res = await origSend(...args);
@@ -300,7 +303,7 @@ const keepAliveUrl =
   process.env.RENDER_EXTERNAL_URL ||
   (process.env.HEROKU_APP_NAME ? `https://${process.env.HEROKU_APP_NAME}.herokuapp.com` : '');
 if (keepAliveUrl) {
-  setInterval(() => {
+  var keepAliveTimer = setInterval(() => {
     fetch(keepAliveUrl, { signal: AbortSignal.timeout(15000) }).catch(() => {});
   }, 4 * 60 * 1000);
   log.info(`Keep-alive ping enabled for ${keepAliveUrl}`);
@@ -308,5 +311,27 @@ if (keepAliveUrl) {
 
 process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e));
 process.on('uncaughtException', (e) => log.error('Uncaught exception:', e));
+
+async function gracefulShutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  log.info(`Received ${signal}; shutting down CASTRO-MD gracefully...`);
+  clearInterval(keepAliveTimer);
+  try { guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
+  try {
+    if (activeSocket) activeSocket.end(new Error('CASTRO-MD is restarting'));
+  } catch (e) {
+    log.warn('WhatsApp socket close warning:', e.message);
+  }
+  const forceExit = setTimeout(() => process.exit(0), 8000);
+  forceExit.unref();
+  server.close(() => {
+    clearTimeout(forceExit);
+    process.exit(0);
+  });
+}
+
+process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
+process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 
 start();
