@@ -28,3 +28,7 @@ services:
         value: "true"
       - key: AUTO_READ
         value: "false"
+      - key: ANTI_CALL
+        value: "false"
+      - key: ALWAYS_ONLINE
+        value: "false"
