@@ -52,6 +52,7 @@ if (settings.sessionId && !fs.existsSync(path.join(settings.sessionDir, 'creds.j
 
 // Tiny web server so hosts like Render/Heroku see an open port and keep the service alive.
 const hits = new Map(); // ip -> [timestamps] for a simple rate limit on pairing requests
+const pairingRequests = new Map(); // phone -> last request time
 const limited = (ip) => {
   const now = Date.now();
   const list = (hits.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
@@ -82,10 +83,24 @@ const server = http.createServer(async (req, res) => {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
       try {
-        const code = await require('./lib/pair').createPairing(url.searchParams.get('number'));
-        return json(res, 200, { code });
+        const number = String(url.searchParams.get('number') || '').replace(/\\D/g, '');
+        if (number.length < 8 || number.length > 15) {
+          return json(res, 400, { error: 'Enter your full WhatsApp number with country code.' });
+        }
+        if (!activeSocket) return json(res, 503, { error: 'WhatsApp is still starting. Wait a few seconds and retry.' });
+        if (activeSocket.authState?.creds?.registered || activeSocket.user) {
+          return json(res, 409, { error: 'CASTRO-MD is already linked. You do not need to pair again.' });
+        }
+        const previous = pairingRequests.get(number) || 0;
+        if (Date.now() - previous < 60000) {
+          return json(res, 429, { error: 'Wait one minute before requesting another code.' });
+        }
+        pairingRequests.set(number, Date.now());
+        const code = await activeSocket.requestPairingCode(number);
+        return json(res, 200, { code: code?.match(/.{1,4}/g)?.join('-') || code });
       } catch (e) {
-        return json(res, 400, { error: e.message });
+        log.error('Pairing-code request failed:', e.message);
+        return json(res, 400, { error: 'Could not generate a pairing code. Check the number and try again.' });
       }
     }
 
@@ -93,28 +108,6 @@ const server = http.createServer(async (req, res) => {
     res.end(`${settings.botName} is running`);
   });
 server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
-
-// After the first successful link, DM the session ID to the linked account (once).
-async function sendSessionId(sock) {
-  try {
-    const flag = path.join(settings.sessionDir, '.session_sent');
-    if (settings.sessionId || fs.existsSync(flag)) return;
-    const id = createSessionId(settings.sessionDir);
-    if (!id) return;
-    const me = sock.user.id.replace(/:\d+@/, '@');
-    await sock.sendMessage(me, { text: id });
-    await sock.sendMessage(me, {
-      text:
-        `*${settings.botName}* is linked.\n\nThe message above is your *SESSION ID*. ` +
-        `Add it to your host as the SESSION_ID variable to deploy without re-linking.\n\n` +
-        `Never share it with anyone: it gives full access to this WhatsApp account.`,
-    });
-    fs.writeFileSync(flag, new Date().toISOString());
-    log.info('Session ID sent to your WhatsApp chat (message yourself).');
-  } catch (e) {
-    log.error('Could not send session ID:', e.message);
-  }
-}
 
 // WhatsApp alert to you (the linked account and any OWNER_NUMBER) whenever the bot connects.
 // A 2-minute cooldown prevents spam if the connection keeps flapping.
@@ -269,7 +262,8 @@ async function start() {
           if (!shuttingDown && settings.alwaysOnline) sock.sendPresenceUpdate('available').catch((e) => log.warn(`Online presence refresh failed: ${e.message}`));
         }, 4 * 60 * 1000);
       }
-      sendSessionId(sock);
+      // Credentials are saved directly by Baileys into the configured session directory.
+      // No manual SESSION_ID copy is needed for a normal pairing.
       warm(sock); // look up the forwarding channel now, so the first reply is not slow
       setTimeout(() => notifyConnected(sock), 3000);
     }
