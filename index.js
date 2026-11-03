@@ -36,6 +36,7 @@ let restoredFromEnv = false;
 const sentCache = new Map();
 let mongoLogged = false;
 let activeSocket = null;
+let presenceTimer = null;
 let shuttingDown = false;
 
 // Log in from SESSION_ID if provided (only when no local session exists yet).
@@ -261,6 +262,13 @@ async function start() {
     }
     if (connection === 'open') {
       log.info(`${settings.botName} connected as ${sock.user?.id}`);
+      clearInterval(presenceTimer);
+      if (settings.alwaysOnline) {
+        sock.sendPresenceUpdate('available').catch((e) => log.warn(`Could not set online presence: ${e.message}`));
+        presenceTimer = setInterval(() => {
+          if (!shuttingDown && settings.alwaysOnline) sock.sendPresenceUpdate('available').catch((e) => log.warn(`Online presence refresh failed: ${e.message}`));
+        }, 4 * 60 * 1000);
+      }
       sendSessionId(sock);
       warm(sock); // look up the forwarding channel now, so the first reply is not slow
       setTimeout(() => notifyConnected(sock), 3000);
@@ -281,6 +289,8 @@ async function start() {
         log.error('Session opened somewhere else (440). This copy is staying idle.');
         return;
       }
+      clearInterval(presenceTimer);
+      presenceTimer = null;
       log.warn(`Connection closed (${code}). Reconnecting...`);
       setTimeout(start, 3000);
     }
@@ -332,6 +342,8 @@ async function gracefulShutdown(signal) {
   shuttingDown = true;
   log.info(`Received ${signal}; shutting down CASTRO-MD gracefully...`);
   clearInterval(keepAliveTimer);
+  clearInterval(presenceTimer);
+  presenceTimer = null;
   try { guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
   try {
     if (activeSocket) activeSocket.end(new Error('CASTRO-MD is restarting'));
