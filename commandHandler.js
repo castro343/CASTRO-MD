@@ -28,12 +28,12 @@ const bold = (raw) => {
 };
 
 // The channel can be changed with the owner command "setchannel"; this is the default.
-const DEFAULT_CHANNEL_LINK = 'https://whatsapp.com/channel/0029Vb8N0xYLikgHxdGh790m';
+const DEFAULT_CHANNEL_LINK = '';
 const channelLink = () => settings.channelLink || DEFAULT_CHANNEL_LINK;
 const channelCode = () => (channelLink().match(/channel\/([A-Za-z0-9_-]+)/) || [])[1];
 
 // Name shown on every forwarded reply ("Forwarded from ...").
-const FORWARD_NAME = 'ADEZ TECH';
+const FORWARD_NAME = 'CASTRO-MD';
 
 // Look up the channel's ID once and remember it. If the lookup fails, wait a minute before retrying
 // so every reply doesn't pay for a failed request.
@@ -76,7 +76,7 @@ const warm = (sock) => {
 };
 
 // When forwarding is on, replies show "Forwarded many times", and look like they
-// came from your channel (shown as ADEZ TECH) if the channel could be loaded.
+// came from your channel (shown as CASTRO-MD) if the channel could be loaded.
 async function fwd(sock) {
   if (!settings.forwarded) return {};
   const contextInfo = { isForwarded: true, forwardingScore: 999 };
