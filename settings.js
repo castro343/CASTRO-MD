@@ -24,6 +24,7 @@ module.exports = {
   autoRead: String(process.env.AUTO_READ || 'false') === 'true',
   antiCall: String(process.env.ANTI_CALL || 'false') === 'true',
   antiDelete: String(process.env.ANTI_DELETE || 'false') === 'true',
+  antiDelete: String(process.env.ANTI_DELETE || 'false') === 'true',
   alwaysOnline: String(process.env.ALWAYS_ONLINE || 'false') === 'true',
   autoViewStatus: String(process.env.AUTO_VIEW_STATUS || 'true') !== 'false',
   mongoUri: (process.env.MONGODB_URI || '').trim(),
