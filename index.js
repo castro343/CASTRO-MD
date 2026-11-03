@@ -252,6 +252,7 @@ async function start() {
       setTimeout(() => notifyConnected(sock), 3000);
     }
     if (connection === 'close') {
+      if (shuttingDown) return;
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
         log.error('Logged out. Delete the session folder and link the bot again.');
