@@ -168,7 +168,7 @@ module.exports = [
     name: 'channel',
     aliases: ['support'],
     description: 'Get the bot channel link',
-    run: async ({ reply, channelLink }) => reply(`Follow our channel:\n${channelLink}`),
+    run: async ({ reply, channelLink }) => reply(channelLink ? `Follow our channel:\n${channelLink}` : 'The official CASTRO-MD channel has not been configured yet.'),
   },
   {
     name: 'uptime',
