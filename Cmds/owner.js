@@ -171,6 +171,21 @@ module.exports = [
     },
   },
   {
+    name: 'antidelete',
+    aliases: ['antidel'],
+    description: 'Notify the owner when a recent incoming text message is deleted: antidelete on|off',
+    ownerOnly: true,
+    run: async ({ reply, args, settings, prefix }) => {
+      const value = String(args[0] || '').toLowerCase();
+      if (!['on', 'off'].includes(value)) {
+        return reply(`Anti-delete is ${settings.antiDelete ? 'ON' : 'OFF'}.\\nUse: ${prefix}antidelete on|off`);
+      }
+      settings.antiDelete = value === 'on';
+      if (!store.save(settings)) return reply('⚠️ Anti-delete changed for this run, but could not be saved. Check persistent storage permissions.');
+      await reply(`✅ Anti-delete turned ${value.toUpperCase()} and saved. It reports recovered text only; media recovery is not enabled.`);
+    },
+  },
+  {
     name: 'alwaysonline',
     aliases: ['online', 'keeponline'],
     description: 'Keep WhatsApp presence online: alwaysonline on|off',
