@@ -171,6 +171,23 @@ module.exports = [
     },
   },
   {
+    name: 'alwaysonline',
+    aliases: ['online', 'keeponline'],
+    description: 'Keep WhatsApp presence online: alwaysonline on|off',
+    ownerOnly: true,
+    run: async ({ sock, reply, args, settings, prefix }) => {
+      const value = String(args[0] || '').toLowerCase();
+      if (!['on', 'off'].includes(value)) {
+        return reply(`Always-online is ${settings.alwaysOnline ? 'ON' : 'OFF'}.\nUse: ${prefix}alwaysonline on|off`);
+      }
+      settings.alwaysOnline = value === 'on';
+      try { await sock.sendPresenceUpdate(settings.alwaysOnline ? 'available' : 'unavailable'); }
+      catch (error) { console.error('[CASTRO-MD:ALWAYSONLINE]', error); }
+      if (!store.save(settings)) return reply('⚠️ Presence changed for this run, but could not be saved. Check persistent storage permissions.');
+      await reply(`✅ Always-online turned ${value.toUpperCase()} and saved.`);
+    },
+  },
+  {
     name: 'runtime',
     aliases: ['uptime'],
     description: 'Show bot uptime',
