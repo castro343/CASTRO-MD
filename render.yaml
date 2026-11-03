@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: nexus-md-wa-bot
+    name: castro-md
     runtime: docker
     plan: free
     healthCheckPath: /
@@ -9,13 +9,15 @@ services:
       - key: SESSION_ID
         sync: false
       - key: OWNER_NUMBER
-        value: "254111783552"
+        value: "254739082713"
       - key: MONGODB_URI
         sync: false
+      - key: MONGODB_DB
+        value: castro_md
       - key: AUTO_VIEW_STATUS
         value: "true"
       - key: BOT_NAME
-        value: Nexus
+        value: CASTRO-MD
       - key: PREFIX
         value: "."
       - key: MODE
