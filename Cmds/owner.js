@@ -135,6 +135,24 @@ module.exports = [
     },
   },
   {
+    name: 'autoread',
+    aliases: ['autoseen', 'readall'],
+    description: 'Automatically mark incoming chats as read: autoread on|off',
+    ownerOnly: true,
+    run: async ({ reply, args, settings, prefix }) => {
+      const v = (args[0] || '').toLowerCase();
+      if (!['on', 'off'].includes(v)) {
+        return reply(`Auto read is ${settings.autoRead ? 'ON' : 'OFF'}.\\nUse: ${prefix}autoread on|off`);
+      }
+      settings.autoRead = v === 'on';
+      if (!store.save(settings)) {
+        await reply('⚠️ Auto read changed for this run, but could not be saved. Check DATA_DIR permissions or persistent storage.');
+        return;
+      }
+      await reply(`✅ Auto read turned ${v.toUpperCase()} and saved.`);
+    },
+  },
+  {
     name: 'runtime',
     aliases: ['uptime'],
     description: 'Show bot uptime',
