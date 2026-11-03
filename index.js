@@ -296,6 +296,39 @@ async function start() {
     }
   });
 
+  // Short-lived cache for anti-delete text alerts. Media is intentionally not recovered or forwarded.
+  const receivedCache = new Map();
+  const cacheMessage = (msg) => {
+    if (!msg?.key?.id || msg.key.fromMe || !msg.message || msg.key.remoteJid === 'status@broadcast') return;
+    receivedCache.set(msg.key.id, { msg, at: Date.now() });
+    if (receivedCache.size > 1000) receivedCache.delete(receivedCache.keys().next().value);
+  };
+
+  sock.ev.on('messages.update', async (updates) => {
+    if (!settings.antiDelete || shuttingDown) return;
+    for (const item of updates || []) {
+      const protocol = item?.update?.message?.protocolMessage;
+      const deletedKey = protocol?.key;
+      // Baileys represents a revoke as protocolMessage type 0 (REVOKE).
+      if (Number(protocol?.type) !== 0 || !deletedKey?.id) continue;
+      const cached = receivedCache.get(deletedKey.id);
+      if (!cached || Date.now() - cached.at > 24 * 60 * 60 * 1000) continue;
+      receivedCache.delete(deletedKey.id);
+      const original = cached.msg;
+      const body = getText(original.message) || '[No recoverable text; this may have been a media message.]';
+      const notice =
+        '*CASTRO-MD ANTI-DELETE*\\n\\n' +
+        'A message was deleted for everyone.\\n' +
+        `Chat: ${original.key.remoteJid || 'Unknown chat'}\\n` +
+        `Sender: ${original.key.participant || original.key.remoteJid || 'Unknown sender'}\\n\\n` +
+        `Recovered text: ${body.slice(0, 3500)}\\n\\n` +
+        '_Only text is reported. Media is not downloaded or forwarded._';
+      for (const number of settings.owners || []) {
+        sock.sendMessage(`${number}@s.whatsapp.net`, { text: notice }).catch((e) => log.warn(`Anti-delete owner notice failed: ${e.message}`));
+      }
+    }
+  });
+
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
       // Status updates are never commands: just mark them as seen when auto view is on.
@@ -305,6 +338,8 @@ async function start() {
         }
         continue;
       }
+      // Cache received messages so a later revoke update can be matched.
+      cacheMessage(msg);
       // Accept live messages, plus your own recent messages synced from your phone.
       const age = Date.now() / 1000 - Number(String(msg.messageTimestamp || 0));
       if (type !== 'notify' && !(type === 'append' && msg.key.fromMe && age < 60)) continue;
