@@ -9,6 +9,18 @@ const path = require('path');
 // The picture is downloaded once and kept in memory, so .menu is instant after the first time.
 const ASSET_NAMES = ['menu.jpg', 'menu.jpeg', 'menu.png'];
 const MENU_VOICE = path.join(__dirname, '..', 'assets', 'menu-intro.opus');
+const CHANNEL_LINK = 'https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBaB18';
+
+async function sendChannelCard(sock, from, opts = {}) {
+  try {
+    await sock.sendMessage(from, {
+      text: `📢 *FOLLOW OUR OFFICIAL WHATSAPP CHANNEL*\n\nStay updated with CASTRO X MD news, features and announcements.\n\n${CHANNEL_LINK}`,
+      ...opts,
+    });
+  } catch (error) {
+    console.error('[MENU] Channel link could not be sent:', error.message);
+  }
+}
 
 async function sendMenuVoice(sock, from, opts = {}) {
   try {
@@ -135,11 +147,13 @@ module.exports = [
         if (!img) {
           await sock.sendMessage(from, { text: full, mentions, ...contextInfo }, opts);
           await sendMenuVoice(sock, from);
+          await sendChannelCard(sock, from);
           return;
         }
         if (full.length <= 3500) {
           await sock.sendMessage(from, { image: img, caption: full, mentions, ...contextInfo }, opts);
           await sendMenuVoice(sock, from);
+          await sendChannelCard(sock, from);
           return;
         }
         await sock.sendMessage(from, { image: img, caption: header, mentions, ...contextInfo }, opts);
@@ -154,9 +168,11 @@ module.exports = [
         }
         if (chunk) await sock.sendMessage(from, { text: chunk });
         await sendMenuVoice(sock, from);
+        await sendChannelCard(sock, from);
       } catch (e) {
         await reply(full); // picture failed: still send the full menu as text
         await sendMenuVoice(sock, from);
+        await sendChannelCard(sock, from);
       }
     },
   },
