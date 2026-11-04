@@ -180,7 +180,10 @@ async function requestTenantPairing(phone) {
       child.removeListener('message', onMessage);
       child.removeListener('exit', onExit);
       if (error) {
-        if (child.exitCode === null) child.kill('SIGTERM');
+        if (child.exitCode === null && !child.killed) child.kill('SIGTERM');
+        getTenantRegistry()
+          .then((registry) => registry.markNeedsPairing(tenant.id))
+          .catch((e) => log.error('Could not reset failed pairing state:', e.message));
         reject(error);
       } else resolve(code);
     };
