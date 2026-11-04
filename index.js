@@ -579,8 +579,19 @@ process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 if (tenantId) {
   // Wait for the manager to attach IPC listeners before opening WhatsApp.
   process.once('message', (message) => {
-    if (message?.type === 'start' && message.tenantId === tenantId) start();
+    if (message?.type === 'start' && message.tenantId === tenantId) {
+      start().catch((error) => {
+        log.error('Tenant worker startup failed:', error.message);
+        if (process.send) {
+          try { process.send({ type: 'pairing-error', tenantId, error: 'Persistent tenant storage is unavailable. Please try again later.' }); } catch {}
+        }
+        process.exit(1);
+      });
+    }
   });
 } else {
-  start();
+  start().catch((error) => {
+    log.error('CASTRO-MD startup failed:', error);
+    process.exit(1);
+  });
 }
