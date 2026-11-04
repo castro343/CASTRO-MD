@@ -107,6 +107,15 @@ function launchTenant(tenant, pairingNumber = '') {
       try { await (await getTenantRegistry()).markConnected(tenant.id); }
       catch (e) { log.error('Could not update tenant connection status:', e.message); }
     }
+    if (message.type === 'logged-out') {
+      tenantRestartAttempts.set(tenant.id, -1);
+      const pending = tenantRestartTimers.get(tenant.id);
+      if (pending) clearTimeout(pending);
+      tenantRestartTimers.delete(tenant.id);
+      try { await (await getTenantRegistry()).markNeedsPairing(tenant.id); }
+      catch (e) { log.error('Could not mark tenant as needing a new pairing:', e.message); }
+      log.warn(`Tenant bot ${tenant.id} was logged out; automatic restarts stopped and fresh pairing is required.`);
+    }
   });
   child.on('exit', async (code) => {
     if (tenantWorkers.get(tenant.id) === child) tenantWorkers.delete(tenant.id);
