@@ -177,7 +177,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(`${settings.botName} is running`);
   });
-if (!tenantId) if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
+if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
 
 // Rehydrate previously linked customer bots after the platform manager starts.
 if (!tenantId) {
