@@ -102,7 +102,7 @@ module.exports = [
     name: 'menu',
     aliases: ['help', 'commands', 'fullmenu', 'allmenu', 'list'],
     description: 'Show every command in one list, with the bot picture',
-    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, fwd, args }) => {
+    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, channel, args }) => {
       // ".menu <command>": what one command does.
       const want = (args[0] || '').toLowerCase().replace(prefix, '');
       if (want && want !== 'all') {
@@ -128,6 +128,24 @@ module.exports = [
       // Everything in ONE message when it fits in a picture caption, otherwise the picture + header first
       // and the rest of the list right after it as plain text.
       const full = `${header}\n\n${sections.join('\n\n')}\n\n${footer}`;
+      // Publish the menu as a real WhatsApp Channel post, then forward that exact
+      // returned message so WhatsApp can render its native channel attribution.
+      // Fall back to the regular menu if channel publishing/forwarding is unavailable.
+      try {
+        const channelInfo = typeof channel === 'function' ? await channel() : null;
+        if (!channelInfo?.jid) throw new Error('Channel metadata is unavailable');
+        const channelText = full.replace(`👋 Hey @${number}`, '👋 Welcome');
+        const channelPost = await sock.sendMessage(channelInfo.jid, { text: channelText });
+        if (!channelPost?.key?.id || !channelPost?.message) {
+          throw new Error('WhatsApp did not return the published channel post');
+        }
+        await sock.sendMessage(from, { forward: channelPost }, { quoted: msg });
+        await sendMenuVoice(sock, from);
+        return;
+      } catch (channelError) {
+        console.error('[MENU] Native channel post/forward failed; using regular menu:', channelError.message);
+      }
+
       const img = await getPicture(sock, settings).catch(() => null);
 
       try {
