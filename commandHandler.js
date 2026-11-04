@@ -259,7 +259,7 @@ async function handle(sock, msg) {
 
     await cmd.run(ctx);
     log.info(`[CMD] "${cmd.name}" finished in ${Date.now() - started}ms`);
-    if (cmd.ownerOnly) await store.save(settings); // keep owner changes (prefix, bot name, ...)
+
   } catch (err) {
     log.error(`Command "${cmd.name}" failed:`, err);
     reply('Something went wrong running that command.').catch(() => {});
