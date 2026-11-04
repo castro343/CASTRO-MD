@@ -132,6 +132,7 @@ async function requestTenantPairing(phone) {
     const onMessage = (message) => {
       if (message?.tenantId !== tenant.id) return;
       if (message.type === 'pairing-code') finish(null, message.code);
+      if (message.type === 'pairing-error') finish(new Error(message.error || 'WhatsApp rejected the pairing request.'));
     };
     const onExit = () => finish(new Error('The bot worker stopped before generating a pairing code.'));
     child.on('message', onMessage);
