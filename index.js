@@ -69,6 +69,8 @@ const json = (res, status, body) => {
 };
 
 const tenantWorkers = new Map();
+const tenantRestartAttempts = new Map();
+const tenantRestartTimers = new Map();
 let tenantRegistry;
 async function getTenantRegistry() {
   if (!settings.mongoUri) throw new Error('Multi-user pairing requires MongoDB to be configured.');
@@ -98,6 +100,10 @@ function launchTenant(tenant, pairingNumber = '') {
   child.on('message', async (message) => {
     if (!message || message.tenantId !== tenant.id) return;
     if (message.type === 'connected') {
+      tenantRestartAttempts.delete(tenant.id);
+      const pending = tenantRestartTimers.get(tenant.id);
+      if (pending) clearTimeout(pending);
+      tenantRestartTimers.delete(tenant.id);
       try { await (await getTenantRegistry()).markConnected(tenant.id); }
       catch (e) { log.error('Could not update tenant connection status:', e.message); }
     }
@@ -106,6 +112,34 @@ function launchTenant(tenant, pairingNumber = '') {
     if (tenantWorkers.get(tenant.id) === child) tenantWorkers.delete(tenant.id);
     try { await (await getTenantRegistry()).markDisconnected(tenant.id); } catch {}
     log.warn(`Tenant bot ${tenant.id} worker exited (${code}).`);
+    // Recover previously linked accounts after an unexpected worker crash.
+    // Never auto-retry provisioning accounts: their first pairing must be completed by the user.
+    if (!shuttingDown && tenantRestartAttempts.get(tenant.id) !== -1) {
+      try {
+        const latest = await (await getTenantRegistry()).get(tenant.id);
+        if (latest && (latest.status === 'disconnected' || latest.status === 'connected')) {
+          const attempts = tenantRestartAttempts.get(tenant.id) || 0;
+          if (attempts < 5) {
+            const delay = Math.min(60000, 3000 * (2 ** attempts));
+            tenantRestartAttempts.set(tenant.id, attempts + 1);
+            const timer = setTimeout(() => {
+              tenantRestartTimers.delete(tenant.id);
+              if (shuttingDown || tenantWorkers.has(tenant.id)) return;
+              const restarted = launchTenant(latest, '');
+              restarted.send({ type: 'start', tenantId: tenant.id });
+              log.info(`Restarted tenant worker ${tenant.id} (attempt ${attempts + 1}/5).`);
+            }, delay);
+            timer.unref();
+            tenantRestartTimers.set(tenant.id, timer);
+          } else {
+            tenantRestartAttempts.set(tenant.id, -1);
+            log.error(`Tenant worker ${tenant.id} reached its restart limit; manual intervention is required.`);
+          }
+        }
+      } catch (e) {
+        log.error(`Could not schedule tenant worker recovery for ${tenant.id}:`, e.message);
+      }
+    }
   });
   return child;
 }
@@ -475,6 +509,11 @@ async function gracefulShutdown(signal) {
   presenceTimer = null;
   try { guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
   try {
+    if (!tenantId) {
+      for (const timer of tenantRestartTimers.values()) clearTimeout(timer);
+      tenantRestartTimers.clear();
+      for (const child of tenantWorkers.values()) child.kill('SIGTERM');
+    }
     if (activeSocket) activeSocket.end(new Error('CASTRO-MD is restarting'));
   } catch (e) {
     log.warn('WhatsApp socket close warning:', e.message);
