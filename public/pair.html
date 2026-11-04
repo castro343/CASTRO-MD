@@ -18,6 +18,8 @@
     input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #28a9ff20}
     button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:12px;background:linear-gradient(100deg,var(--gold),#f1d58b);color:#17120a;font-weight:900;font-size:15px;cursor:pointer}
     button:disabled{opacity:.55;cursor:wait}
+    .copy-btn{margin-top:12px;background:linear-gradient(100deg,#1689d2,#54c5ff);color:#041321}
+    .copy-btn.copied{background:linear-gradient(100deg,#20b879,#8be6b5);color:#04180f}
     .result{display:none;margin-top:20px;padding:18px;border:1px solid #24527a;border-radius:14px;background:#0b1c2b}
     .code{margin:8px 0;color:#7bcaff;font-size:27px;font-weight:900;letter-spacing:.14em;text-align:center;overflow-wrap:anywhere}
     .hint,.foot{font-size:12px;line-height:1.6;color:var(--muted)}
@@ -39,6 +41,8 @@
     <section class="result" id="result" aria-live="polite">
       <div class="hint">Your WhatsApp pairing code</div>
       <div class="code" id="code"></div>
+      <button class="copy-btn" id="copyCode" type="button">COPY PAIRING CODE</button>
+      <div class="hint" id="copyHint" aria-live="polite"></div>
       <div class="hint">On WhatsApp, open Linked devices → Link a device → Link with phone number, then enter this code. Keep the pairing code private. Your linked session is saved automatically.</div>
     </section>
     <p class="foot">BLACK • GOLD • ELECTRIC BLUE<br>Powered by Castro</p>
@@ -48,6 +52,36 @@
     const button=document.getElementById('submit');
     const error=document.getElementById('error');
     const result=document.getElementById('result');
+    const copyButton=document.getElementById('copyCode');
+    const codeElement=document.getElementById('code');
+    const copyHint=document.getElementById('copyHint');
+    // Remove tracking parameters added by link-sharing platforms from the visible address.
+    const cleanUrl=new URL(window.location.href);
+    let cleaned=false;
+    for(const key of [...cleanUrl.searchParams.keys()]){
+      if(key.toLowerCase().startsWith('utm_')){cleanUrl.searchParams.delete(key);cleaned=true;}
+    }
+    if(cleaned)window.history.replaceState({},document.title,cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);
+    copyButton.addEventListener('click',async()=>{
+      const code=codeElement.textContent.trim();
+      if(!code)return;
+      try{
+        if(navigator.clipboard&&window.isSecureContext){
+          await navigator.clipboard.writeText(code);
+        }else{
+          const helper=document.createElement('textarea');
+          helper.value=code;helper.style.position='fixed';helper.style.opacity='0';
+          document.body.appendChild(helper);helper.select();
+          const copied=document.execCommand('copy');helper.remove();
+          if(!copied)throw new Error('Copy unavailable');
+        }
+        copyButton.textContent='COPIED ✓';copyButton.classList.add('copied');
+        copyHint.textContent='Pairing code copied. Paste it into WhatsApp.';
+      }catch(_){
+        copyHint.textContent='Copy was blocked. Press and hold the code above to copy it.';
+      }
+      setTimeout(()=>{copyButton.textContent='COPY PAIRING CODE';copyButton.classList.remove('copied');},2200);
+    });
     form.addEventListener('submit',async event=>{
       event.preventDefault();
       const number=document.getElementById('number').value.replace(/\D/g,'');
@@ -58,7 +92,9 @@
         const response=await fetch('/api/pair?number='+encodeURIComponent(number));
         const data=await response.json();
         if(!response.ok)throw new Error(data.error||'Pairing request failed.');
-        document.getElementById('code').textContent=data.code;
+        codeElement.textContent=data.code;
+        copyButton.textContent='COPY PAIRING CODE';copyButton.classList.remove('copied');
+        copyHint.textContent='';
         result.style.display='block';
       }catch(err){error.textContent=err.message||'Could not reach the pairing service. Try again.';}
       finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE';}
