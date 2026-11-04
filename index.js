@@ -68,6 +68,77 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
+const tenantWorkers = new Map();
+let tenantRegistry;
+async function getTenantRegistry() {
+  if (!settings.mongoUri) throw new Error('Multi-user pairing requires MongoDB to be configured.');
+  if (!tenantRegistry) tenantRegistry = require('./lib/tenantRegistry').createTenantRegistry({
+    uri: settings.mongoUri, dbName: settings.mongoDb,
+  });
+  return tenantRegistry;
+}
+
+function launchTenant(tenant, pairingNumber = '') {
+  const existing = tenantWorkers.get(tenant.id);
+  if (existing && existing.exitCode === null) return existing;
+  const sessionRoot = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'tenants', tenant.id);
+  const child = fork(__filename, [], {
+    env: {
+      ...process.env,
+      TENANT_ID: tenant.id,
+      SESSION_DIR: path.join(sessionRoot, 'session'),
+      DATA_DIR: path.join(sessionRoot, 'data'),
+      PAIRING_NUMBER: pairingNumber,
+      KEEP_ALIVE_URL: '',
+      RENDER_EXTERNAL_URL: '',
+    },
+    stdio: ['ignore', 'inherit', 'inherit', 'ipc'],
+  });
+  tenantWorkers.set(tenant.id, child);
+  child.on('message', async (message) => {
+    if (!message || message.tenantId !== tenant.id) return;
+    if (message.type === 'connected') {
+      try { await (await getTenantRegistry()).markConnected(tenant.id); }
+      catch (e) { log.error('Could not update tenant connection status:', e.message); }
+    }
+  });
+  child.on('exit', async (code) => {
+    if (tenantWorkers.get(tenant.id) === child) tenantWorkers.delete(tenant.id);
+    try { await (await getTenantRegistry()).markDisconnected(tenant.id); } catch {}
+    log.warn(`Tenant bot ${tenant.id} worker exited (${code}).`);
+  });
+  return child;
+}
+
+async function requestTenantPairing(phone) {
+  const registry = await getTenantRegistry();
+  const tenant = await registry.create(phone);
+  if (tenant.status === 'disabled') throw new Error('This bot account is disabled. Contact the platform owner.');
+  if (tenant.status === 'connected') throw new Error('This WhatsApp number already has a CASTRO-MD account.');
+  if (tenantWorkers.has(tenant.id)) throw new Error('A pairing request is already active for this number. Wait a moment and try again.');
+  const child = launchTenant(tenant, phone);
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const timer = setTimeout(() => finish(new Error('Pairing service timed out. Please try again.')), 25000);
+    const finish = (error, code) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      child.removeListener('message', onMessage);
+      child.removeListener('exit', onExit);
+      if (error) reject(error);
+      else resolve(code);
+    };
+    const onMessage = (message) => {
+      if (message?.tenantId !== tenant.id) return;
+      if (message.type === 'pairing-code') finish(null, message.code);
+    };
+    const onExit = () => finish(new Error('The bot worker stopped before generating a pairing code.'));
+    child.on('message', onMessage);
+    child.once('exit', onExit);
+  });
+}
+
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
@@ -86,31 +157,27 @@ const server = http.createServer(async (req, res) => {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
       try {
-        const number = String(url.searchParams.get('number') || '').replace(/\D/g, '');
+        const number = String(url.searchParams.get('number') || '').replace(/\\D/g, '');
         if (number.length < 8 || number.length > 15) {
           return json(res, 400, { error: 'Enter your full WhatsApp number with country code.' });
-        }
-        if (!activeSocket) return json(res, 503, { error: 'WhatsApp is still starting. Wait a few seconds and retry.' });
-        if (activeCredentialsRegistered || activeSocket.user) {
-          return json(res, 409, { error: 'CASTRO-MD is already linked. You do not need to pair again.' });
         }
         const previous = pairingRequests.get(number) || 0;
         if (Date.now() - previous < 60000) {
           return json(res, 429, { error: 'Wait one minute before requesting another code.' });
         }
         pairingRequests.set(number, Date.now());
-        const code = await activeSocket.requestPairingCode(number);
-        return json(res, 200, { code: code?.match(/.{1,4}/g)?.join('-') || code });
+        const code = await requestTenantPairing(number);
+        return json(res, 200, { code });
       } catch (e) {
-        log.error('Pairing-code request failed:', e.message);
-        return json(res, 400, { error: 'Could not generate a pairing code. Check the number and try again.' });
+        log.error('Tenant pairing request failed:', e.message);
+        return json(res, 400, { error: e.message || 'Could not generate a pairing code.' });
       }
     }
 
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(`${settings.botName} is running`);
   });
-if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
+if (!tenantId) if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
 
 // WhatsApp alert to you (the linked account and any OWNER_NUMBER) whenever the bot connects.
 // A 2-minute cooldown prevents spam if the connection keeps flapping.
