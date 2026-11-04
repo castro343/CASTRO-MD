@@ -409,8 +409,11 @@ async function start() {
       if (shuttingDown) return;
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
-        log.error('Logged out. Delete the session folder and link the bot again.');
+        log.error('Logged out. A fresh pairing is required for this account.');
         if (authStore.clear) await authStore.clear().catch(() => {});
+        if (tenantId && process.send) {
+          try { process.send({ type: 'logged-out', tenantId }); } catch {}
+        }
         process.exit(1);
       }
       // 440: the same session was opened somewhere else (for example an overlapping deploy).
