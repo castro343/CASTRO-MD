@@ -318,6 +318,9 @@ async function start() {
   loadCommands();
   fs.mkdirSync(settings.sessionDir, { recursive: true });
   let authStore;
+  if (tenantId && !settings.mongoUri) {
+    throw new Error('Tenant sessions require MongoDB; refusing non-persistent local authentication.');
+  }
   if (settings.mongoUri) {
     try {
       authStore = await require('./lib/mongoAuth').useMongoAuthState(settings.mongoUri, {
@@ -328,7 +331,13 @@ async function start() {
       if (!mongoLogged) log.info('Session storage: MongoDB (login and keys survive redeploys)');
       mongoLogged = true;
     } catch (e) {
-      log.error('MongoDB unavailable, using the local session folder instead:', e.message);
+      log.error('MongoDB authentication storage unavailable:', e.message);
+      // A tenant must never pair against a local-only session: it would appear to
+      // work but disappear on restart/redeploy and could violate account isolation.
+      if (tenantId) {
+        if (process.send) process.send({ type: 'pairing-error', tenantId, error: 'Persistent session storage is unavailable. Please try again later.' });
+        throw e;
+      }
     }
   }
   if (!authStore) authStore = await useMultiFileAuthState(settings.sessionDir);
