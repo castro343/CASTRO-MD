@@ -102,7 +102,7 @@ module.exports = [
     name: 'menu',
     aliases: ['help', 'commands', 'fullmenu', 'allmenu', 'list'],
     description: 'Show every command in one list, with the bot picture',
-    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, channel, args }) => {
+    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, fwd, channel, args }) => {
       // ".menu <command>": what one command does.
       const want = (args[0] || '').toLowerCase().replace(prefix, '');
       if (want && want !== 'all') {
