@@ -160,8 +160,10 @@ async function requestTenantPairing(phone) {
       clearTimeout(timer);
       child.removeListener('message', onMessage);
       child.removeListener('exit', onExit);
-      if (error) reject(error);
-      else resolve(code);
+      if (error) {
+        if (child.exitCode === null) child.kill('SIGTERM');
+        reject(error);
+      } else resolve(code);
     };
     const onMessage = (message) => {
       if (message?.tenantId !== tenant.id) return;
