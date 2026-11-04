@@ -222,7 +222,7 @@ const server = http.createServer(async (req, res) => {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
       try {
-        const number = String(url.searchParams.get('number') || '').replace(/\\D/g, '');
+        const number = String(url.searchParams.get('number') || '').replace(/\D/g, '');
         if (number.length < 8 || number.length > 15) {
           return json(res, 400, { error: 'Enter your full WhatsApp number with country code.' });
         }
