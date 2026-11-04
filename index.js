@@ -466,7 +466,15 @@ async function start() {
       clearInterval(presenceTimer);
       presenceTimer = null;
       log.warn(`Connection closed (${code}). Reconnecting...`);
-      setTimeout(start, 3000);
+      setTimeout(() => {
+        start().catch((error) => {
+          log.error('WhatsApp reconnect startup failed:', error.message);
+          if (tenantId && process.send) {
+            try { process.send({ type: 'pairing-error', tenantId, error: 'Persistent tenant storage is unavailable. The bot worker will restart safely.' }); } catch {}
+          }
+          process.exit(1);
+        });
+      }, 3000);
     }
   });
 
