@@ -66,7 +66,7 @@ const { FOOTER } = require('../lib/brand');
 const TIMEZONE = 'Africa/Nairobi';
 
 // One list with every command, grouped by category.
-function buildMenu({ commands, prefix, settings, number }) {
+function buildMenu({ commands, prefix, settings, number, channelLink }) {
   const groups = {};
   const seen = new Set();
   for (const c of commands) {
@@ -86,7 +86,7 @@ function buildMenu({ commands, prefix, settings, number }) {
     `⌨️ Prefix: [ ${prefix} ]`,
     `🌍 Mode: ${settings.mode}`,
     `⏱️ Uptime: ${formatUptime(process.uptime())}`,
-    `⚙️ Commands: ${total}`,
+    `⚙️ Commands: ${total}`,\n    `📢 Official Channel: ${channelLink || 'Not configured'}`,\n    '━━━━━━━━━━━━━━━━━━━━',\n    'Explore commands below and stay connected.'
   ]);
   const sections = cats.map((cat) =>
     box(
@@ -102,7 +102,7 @@ module.exports = [
     name: 'menu',
     aliases: ['help', 'commands', 'fullmenu', 'allmenu', 'list'],
     description: 'Show every command in one list, with the bot picture',
-    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, fwd, channel, args }) => {
+    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, channelLink, args }) => {
       // ".menu <command>": what one command does.
       const want = (args[0] || '').toLowerCase().replace(prefix, '');
       if (want && want !== 'all') {
@@ -128,92 +128,21 @@ module.exports = [
       // Everything in ONE message when it fits in a picture caption, otherwise the picture + header first
       // and the rest of the list right after it as plain text.
       const full = `${header}\n\n${sections.join('\n\n')}\n\n${footer}`;
-      // Publish the menu as a real WhatsApp Channel post, then forward that exact
-      // returned message so WhatsApp can render its native channel attribution.
-      // Fall back to the regular menu if channel publishing/forwarding is unavailable.
-      try {
-        const channelInfo = typeof channel === 'function' ? await channel() : null;
-        if (!channelInfo?.jid) throw new Error('Channel metadata is unavailable');
-        const channelText = full.replace(`👋 Hey @${number}`, '👋 Welcome');
-        if (typeof sock.subscribeNewsletterUpdates !== 'function' || !sock.ev?.on) {
-          throw new Error('This Baileys connection cannot observe live channel posts');
-        }
-
-        // Listen for WhatsApp's live newsletter message notification BEFORE
-        // publishing. Baileys exposes the channel's server message ID as the
-        // incoming WAMessage key.id; this avoids the known unreliable history API.
-        const serverMessageId = await new Promise(async (resolve, reject) => {
-          let settled = false;
-          const finish = (error, value) => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timer);
-            sock.ev.off?.('messages.upsert', onUpsert);
-            if (error) reject(error);
-            else resolve(value);
-          };
-          const readText = (message) => {
-            let current = message?.message;
-            for (let i = 0; i < 5 && current; i++) {
-              if (typeof current.conversation === 'string') return current.conversation;
-              if (typeof current.extendedTextMessage?.text === 'string') return current.extendedTextMessage.text;
-              const wrapper = current.ephemeralMessage || current.viewOnceMessage || current.viewOnceMessageV2;
-              if (!wrapper?.message) break;
-              current = wrapper.message;
-            }
-            return '';
-          };
-          const onUpsert = ({ messages = [] } = {}) => {
-            for (const posted of messages) {
-              if (posted?.key?.remoteJid !== channelInfo.jid || readText(posted) !== channelText) continue;
-              const id = Number(posted.key.id);
-              if (Number.isSafeInteger(id) && id > 0) return finish(null, id);
-            }
-          };
-          const timer = setTimeout(() => finish(new Error('Timed out waiting for WhatsApp channel post confirmation')), 10000);
-          sock.ev.on('messages.upsert', onUpsert);
-          try {
-            await sock.subscribeNewsletterUpdates(channelInfo.jid);
-            await sock.sendMessage(channelInfo.jid, { text: channelText });
-          } catch (error) {
-            finish(error);
-          }
-        });
-
-        await sock.sendMessage(from, {
-          text: channelText,
-          contextInfo: {
-            isForwarded: true,
-            forwardingScore: 1,
-            forwardedNewsletterMessageInfo: {
-              newsletterJid: channelInfo.jid,
-              newsletterName: channelInfo.name || 'CASTRO-MD',
-              serverMessageId,
-            },
-          },
-        }, { quoted: msg });
-        console.info('[MENU] Sent with native channel attribution');
-        await sendMenuVoice(sock, from);
-        return;
-      } catch (channelError) {
-        console.error('[MENU] Native channel post/forward failed; using regular menu:', channelError.message);
-      }
-
       const img = await getPicture(sock, settings).catch(() => null);
 
       try {
         // No picture available: one plain text message with the whole list.
         if (!img) {
-          await sock.sendMessage(from, { text: full, mentions, ...contextInfo }, opts);
+          await sock.sendMessage(from, { text: full, mentions }, opts);
           await sendMenuVoice(sock, from);
           return;
         }
         if (full.length <= 3500) {
-          await sock.sendMessage(from, { image: img, caption: full, mentions, ...contextInfo }, opts);
+          await sock.sendMessage(from, { image: img, caption: full, mentions }, opts);
           await sendMenuVoice(sock, from);
           return;
         }
-        await sock.sendMessage(from, { image: img, caption: header, mentions, ...contextInfo }, opts);
+        await sock.sendMessage(from, { image: img, caption: header, mentions }, opts);
         // Plain text in chunks below WhatsApp's comfortable size, never splitting a category box.
         let chunk = '';
         for (const sec of [...sections, footer]) {
