@@ -82,7 +82,8 @@ async function getTenantRegistry() {
 
 function launchTenant(tenant, pairingNumber = '') {
   const existing = tenantWorkers.get(tenant.id);
-  if (existing && existing.exitCode === null) return existing;
+  if (existing && existing.exitCode === null && !existing.killed && existing.signalCode === null) return existing;
+  if (existing && (existing.exitCode !== null || existing.killed || existing.signalCode !== null)) tenantWorkers.delete(tenant.id);
   const sessionRoot = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'tenants', tenant.id);
   const child = fork(__filename, [], {
     env: {
@@ -106,6 +107,15 @@ function launchTenant(tenant, pairingNumber = '') {
       tenantRestartTimers.delete(tenant.id);
       try { await (await getTenantRegistry()).markConnected(tenant.id); }
       catch (e) { log.error('Could not update tenant connection status:', e.message); }
+    }
+    if (message.type === 'connection-replaced') {
+      tenantRestartAttempts.set(tenant.id, -1);
+      const pending = tenantRestartTimers.get(tenant.id);
+      if (pending) clearTimeout(pending);
+      tenantRestartTimers.delete(tenant.id);
+      try { await (await getTenantRegistry()).markDisconnected(tenant.id); }
+      catch (e) { log.error('Could not update replaced tenant connection status:', e.message); }
+      log.warn(`Tenant ${tenant.id} was replaced by another WhatsApp connection; automatic retries stopped to prevent a reconnect loop.`);
     }
     if (message.type === 'logged-out') {
       tenantRestartAttempts.set(tenant.id, -1);
@@ -430,7 +440,11 @@ async function start() {
       if (code === DisconnectReason.connectionReplaced) {
         // Another copy took over this login. Stay idle instead of exiting: on Render/Heroku an exit makes the
         // host restart this copy, which then kicks the other one out again, and the two fight forever.
-        log.error('Session opened somewhere else (440). This copy is staying idle.');
+        log.error('Session opened somewhere else (440). Stopping this worker and suppressing automatic restart.');
+        if (tenantId && process.send) {
+          try { process.send({ type: 'connection-replaced', tenantId }); } catch {}
+        }
+        setTimeout(() => process.exit(0), 250);
         return;
       }
       clearInterval(presenceTimer);
