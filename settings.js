@@ -3,19 +3,21 @@ require('dotenv').config({ path: path.join(__dirname, 'set.env') });
 
 const digits = (v) => (v || '').replace(/\D/g, '');
 
-// CASTRO-MD owner / developer. OWNER_NUMBER may add additional owners.
+// The developer is platform metadata, not automatically an owner of every customer bot.
 const DEVELOPER = { name: 'Castro', number: '254739082713' };
 const envOwners = (process.env.OWNER_NUMBER || '').split(',').map(digits).filter(Boolean);
-// A tenant's linked WhatsApp number is an owner of that tenant's bot only.
 const tenantOwner = digits(process.env.PAIRING_NUMBER);
+const isTenant = Boolean(process.env.TENANT_ID);
 
 module.exports = {
   botName: process.env.BOT_NAME || 'CASTRO-MD',
   prefix: process.env.PREFIX || '.',
   developer: DEVELOPER,
-  owners: [...new Set([DEVELOPER.number, ...envOwners, ...(tenantOwner ? [tenantOwner] : [])])],
-  mode: (process.env.MODE || 'public').toLowerCase(),
-  pairingNumber: digits(process.env.PAIRING_NUMBER),
+  // Customer bots are controlled by their own paired number. Platform owners remain
+  // owners only on the legacy/platform bot, never on every tenant automatically.
+  owners: [...new Set(isTenant ? (tenantOwner ? [tenantOwner] : []) : [DEVELOPER.number, ...envOwners])],
+  mode: (process.env.MODE || 'private').toLowerCase(),
+  pairingNumber: tenantOwner,
   sessionId: (process.env.SESSION_ID || '').trim(),
   sessionDir: process.env.SESSION_DIR || path.join(__dirname, 'session'),
   port: Number(process.env.PORT) || 3000,
