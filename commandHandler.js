@@ -28,7 +28,7 @@ const bold = (raw) => {
 };
 
 // The channel can be changed with the owner command "setchannel"; this is the default.
-const DEFAULT_CHANNEL_LINK = '';
+const DEFAULT_CHANNEL_LINK = 'https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBaB18';
 const channelLink = () => settings.channelLink || DEFAULT_CHANNEL_LINK;
 const channelCode = () => (channelLink().match(/channel\/([A-Za-z0-9_-]+)/) || [])[1];
 
