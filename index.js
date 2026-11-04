@@ -173,7 +173,7 @@ async function requestTenantPairing(phone) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => finish(new Error('Pairing service timed out. Please try again.')), 25000);
-    const finish = (error, code) => {
+    const finish = async (error, code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -181,9 +181,13 @@ async function requestTenantPairing(phone) {
       child.removeListener('exit', onExit);
       if (error) {
         if (child.exitCode === null && !child.killed) child.kill('SIGTERM');
-        getTenantRegistry()
-          .then((registry) => registry.markNeedsPairing(tenant.id))
-          .catch((e) => log.error('Could not reset failed pairing state:', e.message));
+        // Persist the retryable state before rejecting the HTTP request. Otherwise a fast
+        // retry can race this write and see the tenant stuck in "provisioning".
+        try {
+          await (await getTenantRegistry()).markNeedsPairing(tenant.id);
+        } catch (e) {
+          log.error('Could not reset failed pairing state:', e.message);
+        }
         reject(error);
       } else resolve(code);
     };
