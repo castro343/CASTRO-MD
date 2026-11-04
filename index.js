@@ -15,6 +15,7 @@ const {
 const settings = require('./settings');
 const { log, baileysLogger } = require('./logger');
 const { loadCommands, handle, warm, commandCount } = require('./commandHandler');
+const store = require('./lib/store');
 const { createSessionId, restoreSession } = require('./lib/session');
 const { getText } = require('./lib/utils');
 const { FOOTER } = require('./lib/brand');
@@ -26,10 +27,9 @@ try {
   guard = require('./lib/guard');
 } catch (e) {
   log.error('Group protection is off (could not load lib/guard.js):', e.message);
-  guard = { onMessage: async () => {}, onParticipants: async () => {} };
+  guard = { init: async () => {}, flush: async () => {}, onMessage: async () => {}, onParticipants: async () => {} };
 }
 
-loadCommands();
 
 let restoredFromEnv = false;
 // Recently sent messages, so WhatsApp can ask for a resend when a phone could not decrypt a reply
@@ -287,6 +287,9 @@ async function notifyConnected(sock) {
 }
 
 async function start() {
+  await store.load(settings);
+  await guard.init?.();
+  loadCommands();
   fs.mkdirSync(settings.sessionDir, { recursive: true });
   let authStore;
   if (settings.mongoUri) {
@@ -509,7 +512,7 @@ async function gracefulShutdown(signal) {
   clearInterval(keepAliveTimer);
   clearInterval(presenceTimer);
   presenceTimer = null;
-  try { guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
+  try { await guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
   try {
     if (!tenantId) {
       for (const timer of tenantRestartTimers.values()) clearTimeout(timer);
