@@ -181,7 +181,7 @@ module.exports = [
         return reply(`Anti-delete is ${settings.antiDelete ? 'ON' : 'OFF'}.\\nUse: ${prefix}antidelete on|off`);
       }
       settings.antiDelete = value === 'on';
-      try { await store.save(settings); } catch (error) { return reply('⚠️ Anti-delete changed for this run, but could not be saved. Check persistent storage permissions.');
+      try { await store.save(settings); } catch (error) { return reply('⚠️ Anti-delete changed for this run, but could not be saved. Check persistent storage permissions.'); }
       await reply(`✅ Anti-delete turned ${value.toUpperCase()} and saved. It reports recovered text only; media recovery is not enabled.`);
     },
   },
@@ -198,7 +198,7 @@ module.exports = [
       settings.alwaysOnline = value === 'on';
       try { await sock.sendPresenceUpdate(settings.alwaysOnline ? 'available' : 'unavailable'); }
       catch (error) { console.error('[CASTRO-MD:ALWAYSONLINE]', error); }
-      try { await store.save(settings); } catch (error) { return reply('⚠️ Presence changed for this run, but could not be saved. Check persistent storage permissions.');
+      try { await store.save(settings); } catch (error) { return reply('⚠️ Presence changed for this run, but could not be saved. Check persistent storage permissions.'); }
       await reply(`✅ Always-online turned ${value.toUpperCase()} and saved.`);
     },
   },
