@@ -136,6 +136,8 @@ async function requestTenantPairing(phone) {
     const onExit = () => finish(new Error('The bot worker stopped before generating a pairing code.'));
     child.on('message', onMessage);
     child.once('exit', onExit);
+    // Begin the worker only after the pairing listener is attached.
+    child.send({ type: 'start', tenantId: tenant.id });
   });
 }
 
@@ -187,7 +189,8 @@ if (!tenantId) {
       const tenants = await registry.list({ limit: 500 });
       for (const tenant of tenants) {
         if (tenant.status === 'connected' || tenant.status === 'disconnected') {
-          launchTenant(tenant, '');
+          const worker = launchTenant(tenant, '');
+          worker.send({ type: 'start', tenantId: tenant.id });
           log.info(`Restoring customer bot worker ${tenant.id}`);
         }
       }
@@ -315,6 +318,7 @@ async function start() {
         log.info('WhatsApp > Linked devices > Link with phone number, then enter the code.');
       } catch (e) {
         log.error('Could not request pairing code:', e.message);
+        if (tenantId && process.send) process.send({ type: 'pairing-error', tenantId, error: e.message });
       }
     }, 3000);
   }
@@ -485,4 +489,11 @@ async function gracefulShutdown(signal) {
 process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 
-start();
+if (tenantId) {
+  // Wait for the manager to attach IPC listeners before opening WhatsApp.
+  process.once('message', (message) => {
+    if (message?.type === 'start' && message.tenantId === tenantId) start();
+  });
+} else {
+  start();
+}
