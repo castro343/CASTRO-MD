@@ -87,7 +87,9 @@ function buildMenu({ commands, prefix, settings, number, channelLink }) {
     `🌍 Mode: ${settings.mode}`,
     `⏱️ Uptime: ${formatUptime(process.uptime())}`,
     `⚙️ Commands: ${total}`,
-    `📢 Official Channel: ${channelLink || 'Not configured'}`,\n    '━━━━━━━━━━━━━━━━━━━━',\n    'Explore commands below and stay connected.'
+    `📢 Official Channel: ${channelLink || 'Not configured'}`,
+    '━━━━━━━━━━━━━━━━━━━━',
+    'Explore commands below and stay connected.'
   ]);
   const sections = cats.map((cat) =>
     box(
