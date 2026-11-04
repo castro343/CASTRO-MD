@@ -127,7 +127,7 @@ module.exports = [
         return reply(`Auto view status is ${settings.autoViewStatus ? 'ON' : 'OFF'}.\nUse: ${prefix}autoviewstatus on|off`);
       }
       settings.autoViewStatus = v === 'on';
-      if (!store.save(settings)) {
+      try { await store.save(settings); } catch (error) {
         await reply('⚠️ Auto view status changed for this run, but could not be saved. Check DATA_DIR permissions or persistent storage.');
         return;
       }
@@ -145,7 +145,7 @@ module.exports = [
         return reply(`Auto read is ${settings.autoRead ? 'ON' : 'OFF'}.\nUse: ${prefix}autoread on|off`);
       }
       settings.autoRead = v === 'on';
-      if (!store.save(settings)) {
+      try { await store.save(settings); } catch (error) {
         await reply('⚠️ Auto read changed for this run, but could not be saved. Check DATA_DIR permissions or persistent storage.');
         return;
       }
@@ -163,7 +163,7 @@ module.exports = [
         return reply(`Anti-call is ${settings.antiCall ? 'ON' : 'OFF'}.\nUse: ${prefix}anticall on|off`);
       }
       settings.antiCall = value === 'on';
-      if (!store.save(settings)) {
+      try { await store.save(settings); } catch (error) {
         await reply('⚠️ Anti-call changed for this run, but could not be saved. Check DATA_DIR permissions or persistent storage.');
         return;
       }
@@ -181,7 +181,7 @@ module.exports = [
         return reply(`Anti-delete is ${settings.antiDelete ? 'ON' : 'OFF'}.\\nUse: ${prefix}antidelete on|off`);
       }
       settings.antiDelete = value === 'on';
-      if (!store.save(settings)) return reply('⚠️ Anti-delete changed for this run, but could not be saved. Check persistent storage permissions.');
+      try { await store.save(settings); } catch (error) { return reply('⚠️ Anti-delete changed for this run, but could not be saved. Check persistent storage permissions.');
       await reply(`✅ Anti-delete turned ${value.toUpperCase()} and saved. It reports recovered text only; media recovery is not enabled.`);
     },
   },
@@ -198,7 +198,7 @@ module.exports = [
       settings.alwaysOnline = value === 'on';
       try { await sock.sendPresenceUpdate(settings.alwaysOnline ? 'available' : 'unavailable'); }
       catch (error) { console.error('[CASTRO-MD:ALWAYSONLINE]', error); }
-      if (!store.save(settings)) return reply('⚠️ Presence changed for this run, but could not be saved. Check persistent storage permissions.');
+      try { await store.save(settings); } catch (error) { return reply('⚠️ Presence changed for this run, but could not be saved. Check persistent storage permissions.');
       await reply(`✅ Always-online turned ${value.toUpperCase()} and saved.`);
     },
   },
