@@ -1,4 +1,5 @@
 const http = require('http');
+const { fork } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const qrcode = require('qrcode-terminal');
@@ -39,6 +40,7 @@ let activeSocket = null;
 let activeCredentialsRegistered = false;
 let presenceTimer = null;
 let shuttingDown = false;
+const tenantId = process.env.TENANT_ID || '';
 
 // Log in from SESSION_ID if provided (only when no local session exists yet).
 if (settings.sessionId && !fs.existsSync(path.join(settings.sessionDir, 'creds.json'))) {
@@ -108,7 +110,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(`${settings.botName} is running`);
   });
-server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
+if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
 
 // WhatsApp alert to you (the linked account and any OWNER_NUMBER) whenever the bot connects.
 // A 2-minute cooldown prevents spam if the connection keeps flapping.
@@ -167,6 +169,7 @@ async function start() {
       authStore = await require('./lib/mongoAuth').useMongoAuthState(settings.mongoUri, {
         dbName: settings.mongoDb,
         seedFile: path.join(settings.sessionDir, 'creds.json'),
+        tenantId: tenantId || 'default',
       });
       if (!mongoLogged) log.info('Session storage: MongoDB (login and keys survive redeploys)');
       mongoLogged = true;
@@ -221,7 +224,9 @@ async function start() {
     setTimeout(async () => {
       try {
         const code = await sock.requestPairingCode(settings.pairingNumber);
-        log.info(`Pairing code: ${code?.match(/.{1,4}/g)?.join('-') || code}`);
+        const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
+        log.info(`Pairing code: ${formattedCode}`);
+        if (tenantId && process.send) process.send({ type: 'pairing-code', tenantId, code: formattedCode });
         log.info('WhatsApp > Linked devices > Link with phone number, then enter the code.');
       } catch (e) {
         log.error('Could not request pairing code:', e.message);
@@ -258,6 +263,7 @@ async function start() {
     if (connection === 'open') {
       activeCredentialsRegistered = true;
       log.info(`${settings.botName} connected as ${sock.user?.id}`);
+      if (tenantId && process.send) process.send({ type: 'connected', tenantId, jid: sock.user?.id || null });
       clearInterval(presenceTimer);
       if (settings.alwaysOnline) {
         sock.sendPresenceUpdate('available').catch((e) => log.warn(`Could not set online presence: ${e.message}`));
@@ -360,7 +366,7 @@ const keepAliveUrl =
   process.env.KEEP_ALIVE_URL ||
   process.env.RENDER_EXTERNAL_URL ||
   (process.env.HEROKU_APP_NAME ? `https://${process.env.HEROKU_APP_NAME}.herokuapp.com` : '');
-if (keepAliveUrl) {
+if (keepAliveUrl && !tenantId) {
   var keepAliveTimer = setInterval(() => {
     fetch(keepAliveUrl, { signal: AbortSignal.timeout(15000) }).catch(() => {});
   }, 4 * 60 * 1000);
