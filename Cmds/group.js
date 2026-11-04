@@ -306,8 +306,10 @@ module.exports = [
     }
     const max = guard.group(from).maxwarns;
     const count = guard.warnAdd(from, user);
+    await guard.flush();
     if (count >= max) {
       guard.warnReset(from, user);
+      await guard.flush();
       if (isBotAdmin) {
         await say(ctx, 'WARNING', [`${tag(user)} reached ${max} warnings and was removed.`], [user]);
         return sock.groupParticipantsUpdate(from, [user], 'remove');
@@ -329,6 +331,7 @@ module.exports = [
     const [user] = targets(msg);
     if (!user) return reply(`Mention or reply to someone: ${prefix}resetwarn @user`);
     guard.warnReset(from, user);
+    await guard.flush();
     await say(ctx, 'WARNINGS', [`Cleared the warnings for ${tag(user)}.`], [user]);
   }, { aliases: ['clearwarn'], botAdmin: false }),
 
