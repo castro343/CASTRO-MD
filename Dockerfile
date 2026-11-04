@@ -1,6 +1,15 @@
 FROM node:20-slim
 
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
+# yt-dlp handles supported video/audio sources; ffmpeg merges streams and
+# converts audio to MP3. Install the current standalone yt-dlp release so
+# the downloader is available in the production container PATH.
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    git ca-certificates curl ffmpeg \
+    && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
+       -o /usr/local/bin/yt-dlp \
+    && chmod 0755 /usr/local/bin/yt-dlp \
+    && yt-dlp --version \
+    && ffmpeg -version \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
