@@ -86,7 +86,8 @@ function buildMenu({ commands, prefix, settings, number, channelLink }) {
     `⌨️ Prefix: [ ${prefix} ]`,
     `🌍 Mode: ${settings.mode}`,
     `⏱️ Uptime: ${formatUptime(process.uptime())}`,
-    `⚙️ Commands: ${total}`,\n    `📢 Official Channel: ${channelLink || 'Not configured'}`,\n    '━━━━━━━━━━━━━━━━━━━━',\n    'Explore commands below and stay connected.'
+    `⚙️ Commands: ${total}`,
+    `📢 Official Channel: ${channelLink || 'Not configured'}`,\n    '━━━━━━━━━━━━━━━━━━━━',\n    'Explore commands below and stay connected.'
   ]);
   const sections = cats.map((cat) =>
     box(
@@ -119,11 +120,9 @@ module.exports = [
       }
 
       const number = String(sender || '').split('@')[0].split(':')[0];
-      const { header, sections, footer } = buildMenu({ commands, prefix, settings, number });
+      const { header, sections, footer } = buildMenu({ commands, prefix, settings, number, channelLink });
       const mentions = sender ? [sender] : [];
-      const f = fwd ? await fwd() : {};
       const opts = { quoted: msg };
-      const contextInfo = f.contextInfo ? { contextInfo: f.contextInfo } : {};
 
       // Everything in ONE message when it fits in a picture caption, otherwise the picture + header first
       // and the rest of the list right after it as plain text.
