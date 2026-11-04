@@ -8,6 +8,24 @@ const path = require('path');
 // Order: assets/menu.jpg (or .png/.jpeg) in the project -> MENU_IMAGE link -> the bot's own profile picture.
 // The picture is downloaded once and kept in memory, so .menu is instant after the first time.
 const ASSET_NAMES = ['menu.jpg', 'menu.jpeg', 'menu.png'];
+const MENU_VOICE = path.join(__dirname, '..', 'assets', 'menu-intro.opus');
+
+async function sendMenuVoice(sock, from, opts = {}) {
+  try {
+    if (!fs.existsSync(MENU_VOICE)) return false;
+    const audio = fs.readFileSync(MENU_VOICE);
+    if (!audio.length) return false;
+    await sock.sendMessage(from, {
+      audio,
+      mimetype: 'audio/ogg; codecs=opus',
+      ptt: true,
+    }, opts);
+    return true;
+  } catch (error) {
+    console.error('[MENU] Voice intro could not be sent:', error.message);
+    return false;
+  }
+}
 let picture = { buf: null, at: 0 };
 
 async function fetchBuffer(url) {
@@ -114,9 +132,15 @@ module.exports = [
 
       try {
         // No picture available: one plain text message with the whole list.
-        if (!img) return await sock.sendMessage(from, { text: full, mentions, ...contextInfo }, opts);
+        if (!img) {
+          await sock.sendMessage(from, { text: full, mentions, ...contextInfo }, opts);
+          await sendMenuVoice(sock, from);
+          return;
+        }
         if (full.length <= 3500) {
-          return await sock.sendMessage(from, { image: img, caption: full, mentions, ...contextInfo }, opts);
+          await sock.sendMessage(from, { image: img, caption: full, mentions, ...contextInfo }, opts);
+          await sendMenuVoice(sock, from);
+          return;
         }
         await sock.sendMessage(from, { image: img, caption: header, mentions, ...contextInfo }, opts);
         // Plain text in chunks below WhatsApp's comfortable size, never splitting a category box.
@@ -129,8 +153,10 @@ module.exports = [
           chunk += (chunk ? '\n\n' : '') + sec;
         }
         if (chunk) await sock.sendMessage(from, { text: chunk });
+        await sendMenuVoice(sock, from);
       } catch (e) {
         await reply(full); // picture failed: still send the full menu as text
+        await sendMenuVoice(sock, from);
       }
     },
   },
