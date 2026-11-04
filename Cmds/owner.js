@@ -6,6 +6,31 @@ const store = require('../lib/store');
 
 module.exports = [
   {
+    name: 'mode',
+    description: 'Set command access to private or public: mode private|public',
+    ownerOnly: true,
+    run: async ({ args, reply, settings, prefix }) => {
+      const requested = String(args[0] || '').toLowerCase();
+      if (!requested) {
+        return reply(`🔐 Current bot mode: ${settings.mode.toUpperCase()}\nUse: ${prefix}mode private or ${prefix}mode public`);
+      }
+      if (!['private', 'public'].includes(requested)) {
+        return reply(`❌ Invalid mode. Use: ${prefix}mode private or ${prefix}mode public`);
+      }
+      const previous = settings.mode;
+      settings.mode = requested;
+      try {
+        await store.save(settings);
+      } catch (error) {
+        settings.mode = previous;
+        return reply('❌ Could not save the mode. Your previous mode is unchanged.');
+      }
+      return reply(requested === 'private'
+        ? '🔒 PRIVATE MODE enabled. Only this bot account owner can trigger commands.'
+        : '🌍 PUBLIC MODE enabled. Anyone can use public commands; owner-only commands remain protected.');
+    },
+  },
+  {
     name: 'profilename',
     aliases: ['profile-name'],
     description: 'Change the WhatsApp profile name',
