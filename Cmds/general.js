@@ -135,37 +135,50 @@ module.exports = [
         const channelInfo = typeof channel === 'function' ? await channel() : null;
         if (!channelInfo?.jid) throw new Error('Channel metadata is unavailable');
         const channelText = full.replace(`👋 Hey @${number}`, '👋 Welcome');
-        await sock.sendMessage(channelInfo.jid, { text: channelText });
+        if (typeof sock.subscribeNewsletterUpdates !== 'function' || !sock.ev?.on) {
+          throw new Error('This Baileys connection cannot observe live channel posts');
+        }
 
-        // Channel posts have a server-side numeric update ID. The local WAMessage
-        // key.id is not that ID, so resolve the published post from the newsletter
-        // history before attaching WhatsApp's native "View channel" attribution.
-        if (typeof sock.newsletterFetchMessages !== 'function') {
-          throw new Error('This Baileys connection cannot fetch channel post IDs');
-        }
-        const updates = await Promise.race([
-          sock.newsletterFetchMessages('jid', channelInfo.jid, 20),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Channel history lookup timed out')), 8000)),
-        ]);
-        const readText = (message) => {
-          let current = message?.message;
-          for (let i = 0; i < 5 && current; i++) {
-            if (typeof current.conversation === 'string') return current.conversation;
-            if (typeof current.extendedTextMessage?.text === 'string') return current.extendedTextMessage.text;
-            const wrapper = current.ephemeralMessage || current.viewOnceMessage || current.viewOnceMessageV2;
-            if (!wrapper?.message) break;
-            current = wrapper.message;
+        // Listen for WhatsApp's live newsletter message notification BEFORE
+        // publishing. Baileys exposes the channel's server message ID as the
+        // incoming WAMessage key.id; this avoids the known unreliable history API.
+        const serverMessageId = await new Promise(async (resolve, reject) => {
+          let settled = false;
+          const finish = (error, value) => {
+            if (settled) return;
+            settled = true;
+            clearTimeout(timer);
+            sock.ev.off?.('messages.upsert', onUpsert);
+            if (error) reject(error);
+            else resolve(value);
+          };
+          const readText = (message) => {
+            let current = message?.message;
+            for (let i = 0; i < 5 && current; i++) {
+              if (typeof current.conversation === 'string') return current.conversation;
+              if (typeof current.extendedTextMessage?.text === 'string') return current.extendedTextMessage.text;
+              const wrapper = current.ephemeralMessage || current.viewOnceMessage || current.viewOnceMessageV2;
+              if (!wrapper?.message) break;
+              current = wrapper.message;
+            }
+            return '';
+          };
+          const onUpsert = ({ messages = [] } = {}) => {
+            for (const posted of messages) {
+              if (posted?.key?.remoteJid !== channelInfo.jid || readText(posted) !== channelText) continue;
+              const id = Number(posted.key.id);
+              if (Number.isSafeInteger(id) && id > 0) return finish(null, id);
+            }
+          };
+          const timer = setTimeout(() => finish(new Error('Timed out waiting for WhatsApp channel post confirmation')), 10000);
+          sock.ev.on('messages.upsert', onUpsert);
+          try {
+            await sock.subscribeNewsletterUpdates(channelInfo.jid);
+            await sock.sendMessage(channelInfo.jid, { text: channelText });
+          } catch (error) {
+            finish(error);
           }
-          return '';
-        };
-        const published = (Array.isArray(updates) ? updates : []).find((update) => {
-          const text = readText(update.message);
-          return text === channelText;
         });
-        const serverMessageId = Number(published?.server_id);
-        if (!Number.isSafeInteger(serverMessageId) || serverMessageId <= 0) {
-          throw new Error('Published channel post was not found in channel history');
-        }
 
         await sock.sendMessage(from, {
           text: channelText,
