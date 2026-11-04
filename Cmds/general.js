@@ -135,11 +135,51 @@ module.exports = [
         const channelInfo = typeof channel === 'function' ? await channel() : null;
         if (!channelInfo?.jid) throw new Error('Channel metadata is unavailable');
         const channelText = full.replace(`👋 Hey @${number}`, '👋 Welcome');
-        const channelPost = await sock.sendMessage(channelInfo.jid, { text: channelText });
-        if (!channelPost?.key?.id || !channelPost?.message) {
-          throw new Error('WhatsApp did not return the published channel post');
+        await sock.sendMessage(channelInfo.jid, { text: channelText });
+
+        // Channel posts have a server-side numeric update ID. The local WAMessage
+        // key.id is not that ID, so resolve the published post from the newsletter
+        // history before attaching WhatsApp's native "View channel" attribution.
+        if (typeof sock.newsletterFetchMessages !== 'function') {
+          throw new Error('This Baileys connection cannot fetch channel post IDs');
         }
-        await sock.sendMessage(from, { forward: channelPost }, { quoted: msg });
+        const updates = await Promise.race([
+          sock.newsletterFetchMessages('jid', channelInfo.jid, 20),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Channel history lookup timed out')), 8000)),
+        ]);
+        const readText = (message) => {
+          let current = message?.message;
+          for (let i = 0; i < 5 && current; i++) {
+            if (typeof current.conversation === 'string') return current.conversation;
+            if (typeof current.extendedTextMessage?.text === 'string') return current.extendedTextMessage.text;
+            const wrapper = current.ephemeralMessage || current.viewOnceMessage || current.viewOnceMessageV2;
+            if (!wrapper?.message) break;
+            current = wrapper.message;
+          }
+          return '';
+        };
+        const published = (Array.isArray(updates) ? updates : []).find((update) => {
+          const text = readText(update.message);
+          return text === channelText;
+        });
+        const serverMessageId = Number(published?.server_id);
+        if (!Number.isSafeInteger(serverMessageId) || serverMessageId <= 0) {
+          throw new Error('Published channel post was not found in channel history');
+        }
+
+        await sock.sendMessage(from, {
+          text: channelText,
+          contextInfo: {
+            isForwarded: true,
+            forwardingScore: 1,
+            forwardedNewsletterMessageInfo: {
+              newsletterJid: channelInfo.jid,
+              newsletterName: channelInfo.name || 'CASTRO-MD',
+              serverMessageId,
+            },
+          },
+        }, { quoted: msg });
+        console.info('[MENU] Sent with native channel attribution');
         await sendMenuVoice(sock, from);
         return;
       } catch (channelError) {
