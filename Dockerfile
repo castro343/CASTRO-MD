@@ -1,10 +1,9 @@
 FROM node:20-slim
 
 # yt-dlp handles supported video/audio sources; ffmpeg merges streams and
-# converts audio to MP3. Install the current standalone yt-dlp release so
-# the downloader is available in the production container PATH.
+# converts audio to MP3. The standalone yt-dlp release requires Python 3.
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    git ca-certificates curl ffmpeg \
+    git ca-certificates curl python3 ffmpeg \
     && curl -fL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp \
        -o /usr/local/bin/yt-dlp \
     && chmod 0755 /usr/local/bin/yt-dlp \
