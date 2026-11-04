@@ -15,6 +15,7 @@ const {
 const settings = require('./settings');
 const { log, baileysLogger } = require('./logger');
 const { loadCommands, handle, warm, commandCount } = require('./commandHandler');
+const store = require('./lib/store');
 const { createSessionId, restoreSession } = require('./lib/session');
 const { getText } = require('./lib/utils');
 const { FOOTER } = require('./lib/brand');
@@ -26,10 +27,9 @@ try {
   guard = require('./lib/guard');
 } catch (e) {
   log.error('Group protection is off (could not load lib/guard.js):', e.message);
-  guard = { onMessage: async () => {}, onParticipants: async () => {} };
+  guard = { init: async () => {}, flush: async () => {}, onMessage: async () => {}, onParticipants: async () => {} };
 }
 
-loadCommands();
 
 let restoredFromEnv = false;
 // Recently sent messages, so WhatsApp can ask for a resend when a phone could not decrypt a reply
@@ -69,6 +69,8 @@ const json = (res, status, body) => {
 };
 
 const tenantWorkers = new Map();
+const tenantRestartAttempts = new Map();
+const tenantRestartTimers = new Map();
 let tenantRegistry;
 async function getTenantRegistry() {
   if (!settings.mongoUri) throw new Error('Multi-user pairing requires MongoDB to be configured.');
@@ -80,7 +82,8 @@ async function getTenantRegistry() {
 
 function launchTenant(tenant, pairingNumber = '') {
   const existing = tenantWorkers.get(tenant.id);
-  if (existing && existing.exitCode === null) return existing;
+  if (existing && existing.exitCode === null && !existing.killed && existing.signalCode === null) return existing;
+  if (existing && (existing.exitCode !== null || existing.killed || existing.signalCode !== null)) tenantWorkers.delete(tenant.id);
   const sessionRoot = path.join(process.env.DATA_DIR || path.join(__dirname, 'data'), 'tenants', tenant.id);
   const child = fork(__filename, [], {
     env: {
@@ -98,14 +101,64 @@ function launchTenant(tenant, pairingNumber = '') {
   child.on('message', async (message) => {
     if (!message || message.tenantId !== tenant.id) return;
     if (message.type === 'connected') {
+      tenantRestartAttempts.delete(tenant.id);
+      const pending = tenantRestartTimers.get(tenant.id);
+      if (pending) clearTimeout(pending);
+      tenantRestartTimers.delete(tenant.id);
       try { await (await getTenantRegistry()).markConnected(tenant.id); }
       catch (e) { log.error('Could not update tenant connection status:', e.message); }
+    }
+    if (message.type === 'connection-replaced') {
+      tenantRestartAttempts.set(tenant.id, -1);
+      const pending = tenantRestartTimers.get(tenant.id);
+      if (pending) clearTimeout(pending);
+      tenantRestartTimers.delete(tenant.id);
+      try { await (await getTenantRegistry()).markDisconnected(tenant.id); }
+      catch (e) { log.error('Could not update replaced tenant connection status:', e.message); }
+      log.warn(`Tenant ${tenant.id} was replaced by another WhatsApp connection; automatic retries stopped to prevent a reconnect loop.`);
+    }
+    if (message.type === 'logged-out') {
+      tenantRestartAttempts.set(tenant.id, -1);
+      const pending = tenantRestartTimers.get(tenant.id);
+      if (pending) clearTimeout(pending);
+      tenantRestartTimers.delete(tenant.id);
+      try { await (await getTenantRegistry()).markNeedsPairing(tenant.id); }
+      catch (e) { log.error('Could not mark tenant as needing a new pairing:', e.message); }
+      log.warn(`Tenant bot ${tenant.id} was logged out; automatic restarts stopped and fresh pairing is required.`);
     }
   });
   child.on('exit', async (code) => {
     if (tenantWorkers.get(tenant.id) === child) tenantWorkers.delete(tenant.id);
     try { await (await getTenantRegistry()).markDisconnected(tenant.id); } catch {}
     log.warn(`Tenant bot ${tenant.id} worker exited (${code}).`);
+    // Recover previously linked accounts after an unexpected worker crash.
+    // Never auto-retry provisioning accounts: their first pairing must be completed by the user.
+    if (!shuttingDown && tenantRestartAttempts.get(tenant.id) !== -1) {
+      try {
+        const latest = await (await getTenantRegistry()).get(tenant.id);
+        if (latest && (latest.status === 'disconnected' || latest.status === 'connected')) {
+          const attempts = tenantRestartAttempts.get(tenant.id) || 0;
+          if (attempts < 5) {
+            const delay = Math.min(60000, 3000 * (2 ** attempts));
+            tenantRestartAttempts.set(tenant.id, attempts + 1);
+            const timer = setTimeout(() => {
+              tenantRestartTimers.delete(tenant.id);
+              if (shuttingDown || tenantWorkers.has(tenant.id)) return;
+              const restarted = launchTenant(latest, '');
+              restarted.send({ type: 'start', tenantId: tenant.id });
+              log.info(`Restarted tenant worker ${tenant.id} (attempt ${attempts + 1}/5).`);
+            }, delay);
+            timer.unref();
+            tenantRestartTimers.set(tenant.id, timer);
+          } else {
+            tenantRestartAttempts.set(tenant.id, -1);
+            log.error(`Tenant worker ${tenant.id} reached its restart limit; manual intervention is required.`);
+          }
+        }
+      } catch (e) {
+        log.error(`Could not schedule tenant worker recovery for ${tenant.id}:`, e.message);
+      }
+    }
   });
   return child;
 }
@@ -120,22 +173,34 @@ async function requestTenantPairing(phone) {
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => finish(new Error('Pairing service timed out. Please try again.')), 25000);
-    const finish = (error, code) => {
+    const finish = async (error, code) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       child.removeListener('message', onMessage);
       child.removeListener('exit', onExit);
-      if (error) reject(error);
-      else resolve(code);
+      if (error) {
+        if (child.exitCode === null && !child.killed) child.kill('SIGTERM');
+        // Persist the retryable state before rejecting the HTTP request. Otherwise a fast
+        // retry can race this write and see the tenant stuck in "provisioning".
+        try {
+          await (await getTenantRegistry()).markNeedsPairing(tenant.id);
+        } catch (e) {
+          log.error('Could not reset failed pairing state:', e.message);
+        }
+        reject(error);
+      } else resolve(code);
     };
     const onMessage = (message) => {
       if (message?.tenantId !== tenant.id) return;
       if (message.type === 'pairing-code') finish(null, message.code);
+      if (message.type === 'pairing-error') finish(new Error(message.error || 'WhatsApp rejected the pairing request.'));
     };
     const onExit = () => finish(new Error('The bot worker stopped before generating a pairing code.'));
     child.on('message', onMessage);
     child.once('exit', onExit);
+    // Begin the worker only after the pairing listener is attached.
+    child.send({ type: 'start', tenantId: tenant.id });
   });
 }
 
@@ -157,7 +222,7 @@ const server = http.createServer(async (req, res) => {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
       try {
-        const number = String(url.searchParams.get('number') || '').replace(/\\D/g, '');
+        const number = String(url.searchParams.get('number') || '').replace(/\D/g, '');
         if (number.length < 8 || number.length > 15) {
           return json(res, 400, { error: 'Enter your full WhatsApp number with country code.' });
         }
@@ -177,7 +242,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/plain' });
     res.end(`${settings.botName} is running`);
   });
-if (!tenantId) if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
+if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
 
 // Rehydrate previously linked customer bots after the platform manager starts.
 if (!tenantId) {
@@ -187,7 +252,8 @@ if (!tenantId) {
       const tenants = await registry.list({ limit: 500 });
       for (const tenant of tenants) {
         if (tenant.status === 'connected' || tenant.status === 'disconnected') {
-          launchTenant(tenant, '');
+          const worker = launchTenant(tenant, '');
+          worker.send({ type: 'start', tenantId: tenant.id });
           log.info(`Restoring customer bot worker ${tenant.id}`);
         }
       }
@@ -247,8 +313,14 @@ async function notifyConnected(sock) {
 }
 
 async function start() {
+  await store.load(settings);
+  await guard.init?.();
+  loadCommands();
   fs.mkdirSync(settings.sessionDir, { recursive: true });
   let authStore;
+  if (tenantId && !settings.mongoUri) {
+    throw new Error('Tenant sessions require MongoDB; refusing non-persistent local authentication.');
+  }
   if (settings.mongoUri) {
     try {
       authStore = await require('./lib/mongoAuth').useMongoAuthState(settings.mongoUri, {
@@ -259,7 +331,13 @@ async function start() {
       if (!mongoLogged) log.info('Session storage: MongoDB (login and keys survive redeploys)');
       mongoLogged = true;
     } catch (e) {
-      log.error('MongoDB unavailable, using the local session folder instead:', e.message);
+      log.error('MongoDB authentication storage unavailable:', e.message);
+      // A tenant must never pair against a local-only session: it would appear to
+      // work but disappear on restart/redeploy and could violate account isolation.
+      if (tenantId) {
+        if (process.send) process.send({ type: 'pairing-error', tenantId, error: 'Persistent session storage is unavailable. Please try again later.' });
+        throw e;
+      }
     }
   }
   if (!authStore) authStore = await useMultiFileAuthState(settings.sessionDir);
@@ -315,6 +393,7 @@ async function start() {
         log.info('WhatsApp > Linked devices > Link with phone number, then enter the code.');
       } catch (e) {
         log.error('Could not request pairing code:', e.message);
+        if (tenantId && process.send) process.send({ type: 'pairing-error', tenantId, error: e.message });
       }
     }, 3000);
   }
@@ -365,8 +444,11 @@ async function start() {
       if (shuttingDown) return;
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
-        log.error('Logged out. Delete the session folder and link the bot again.');
+        log.error('Logged out. A fresh pairing is required for this account.');
         if (authStore.clear) await authStore.clear().catch(() => {});
+        if (tenantId && process.send) {
+          try { process.send({ type: 'logged-out', tenantId }); } catch {}
+        }
         process.exit(1);
       }
       // 440: the same session was opened somewhere else (for example an overlapping deploy).
@@ -374,13 +456,25 @@ async function start() {
       if (code === DisconnectReason.connectionReplaced) {
         // Another copy took over this login. Stay idle instead of exiting: on Render/Heroku an exit makes the
         // host restart this copy, which then kicks the other one out again, and the two fight forever.
-        log.error('Session opened somewhere else (440). This copy is staying idle.');
+        log.error('Session opened somewhere else (440). Stopping this worker and suppressing automatic restart.');
+        if (tenantId && process.send) {
+          try { process.send({ type: 'connection-replaced', tenantId }); } catch {}
+        }
+        setTimeout(() => process.exit(0), 250);
         return;
       }
       clearInterval(presenceTimer);
       presenceTimer = null;
       log.warn(`Connection closed (${code}). Reconnecting...`);
-      setTimeout(start, 3000);
+      setTimeout(() => {
+        start().catch((error) => {
+          log.error('WhatsApp reconnect startup failed:', error.message);
+          if (tenantId && process.send) {
+            try { process.send({ type: 'pairing-error', tenantId, error: 'Persistent tenant storage is unavailable. The bot worker will restart safely.' }); } catch {}
+          }
+          process.exit(1);
+        });
+      }, 3000);
     }
   });
 
@@ -468,8 +562,13 @@ async function gracefulShutdown(signal) {
   clearInterval(keepAliveTimer);
   clearInterval(presenceTimer);
   presenceTimer = null;
-  try { guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
+  try { await guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
   try {
+    if (!tenantId) {
+      for (const timer of tenantRestartTimers.values()) clearTimeout(timer);
+      tenantRestartTimers.clear();
+      for (const child of tenantWorkers.values()) child.kill('SIGTERM');
+    }
     if (activeSocket) activeSocket.end(new Error('CASTRO-MD is restarting'));
   } catch (e) {
     log.warn('WhatsApp socket close warning:', e.message);
@@ -485,4 +584,22 @@ async function gracefulShutdown(signal) {
 process.once('SIGTERM', () => gracefulShutdown('SIGTERM'));
 process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 
-start();
+if (tenantId) {
+  // Wait for the manager to attach IPC listeners before opening WhatsApp.
+  process.once('message', (message) => {
+    if (message?.type === 'start' && message.tenantId === tenantId) {
+      start().catch((error) => {
+        log.error('Tenant worker startup failed:', error.message);
+        if (process.send) {
+          try { process.send({ type: 'pairing-error', tenantId, error: 'Persistent tenant storage is unavailable. Please try again later.' }); } catch {}
+        }
+        process.exit(1);
+      });
+    }
+  });
+} else {
+  start().catch((error) => {
+    log.error('CASTRO-MD startup failed:', error);
+    process.exit(1);
+  });
+}

@@ -129,7 +129,6 @@ function loadCommands() {
       for (const n of [cmd.name, ...(cmd.aliases || [])]) commands.set(n.toLowerCase(), cmd);
     }
   }
-  store.load(settings); // settings changed by owner commands (prefix, bot name, ...)
   log.info(`Loaded ${unique.size} commands${failed.length ? ` (FAILED to load: ${failed.join(', ')})` : ''}`);
   log.info(`Prefix "${settings.prefix}" | mode ${settings.mode} | owners ${settings.owners.length}`);
 }
@@ -260,7 +259,7 @@ async function handle(sock, msg) {
 
     await cmd.run(ctx);
     log.info(`[CMD] "${cmd.name}" finished in ${Date.now() - started}ms`);
-    if (cmd.ownerOnly) store.save(settings); // keep owner changes (prefix, bot name, ...)
+
   } catch (err) {
     log.error(`Command "${cmd.name}" failed:`, err);
     reply('Something went wrong running that command.').catch(() => {});

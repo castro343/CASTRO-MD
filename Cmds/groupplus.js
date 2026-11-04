@@ -40,6 +40,7 @@ module.exports = [
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}antilink on|off`);
     g.antilink.on = value === 'on';
     guard.touch();
+    await guard.flush();
     await reply(`Antilink protection turned ${value.toUpperCase()}.`);
   }),
 
@@ -48,6 +49,7 @@ module.exports = [
     if (!['delete', 'warn', 'kick'].includes(value)) return reply(`Use: ${prefix}antilinkmode delete|warn|kick`);
     group(from).antilink.mode = value;
     guard.touch();
+    await guard.flush();
     await reply(`Antilink action set to ${value}.`);
   }),
 
@@ -56,6 +58,7 @@ module.exports = [
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}antilinkall on|off`);
     group(from).antilink.all = value === 'on';
     guard.touch();
+    await guard.flush();
     await reply(value === 'on' ? 'All links will be blocked.' : 'Only WhatsApp invite/channel links will be blocked.');
   }),
 
@@ -64,6 +67,7 @@ module.exports = [
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}antispam on|off`);
     group(from).antispam = value === 'on';
     guard.touch();
+    await guard.flush();
     await reply(`Anti-spam turned ${value.toUpperCase()}.`);
   }),
 
@@ -72,6 +76,7 @@ module.exports = [
     if (!Number.isInteger(value) || value < 0 || value > 3600) return reply(`Use: ${prefix}slowmode 0-3600`);
     group(from).slowmode = value;
     guard.touch();
+    await guard.flush();
     await reply(value ? `Slow mode set to one message every ${value} seconds.` : 'Slow mode disabled.');
   }),
 
@@ -80,6 +85,7 @@ module.exports = [
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}welcome on|off`);
     group(from).welcome.on = value === 'on';
     guard.touch();
+    await guard.flush();
     await reply(`Welcome messages turned ${value.toUpperCase()}.`);
   }),
 
@@ -88,6 +94,7 @@ module.exports = [
     if (text.length > 1000) return reply('Welcome text must be 1000 characters or fewer.');
     group(from).welcome.text = text;
     guard.touch();
+    await guard.flush();
     await reply('Welcome message saved.');
   }),
 
@@ -96,6 +103,7 @@ module.exports = [
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}goodbye on|off`);
     group(from).goodbye.on = value === 'on';
     guard.touch();
+    await guard.flush();
     await reply(`Goodbye messages turned ${value.toUpperCase()}.`);
   }),
 
@@ -104,6 +112,7 @@ module.exports = [
     if (text.length > 1000) return reply('Goodbye text must be 1000 characters or fewer.');
     group(from).goodbye.text = text;
     guard.touch();
+    await guard.flush();
     await reply('Goodbye message saved.');
   }),
 
@@ -114,6 +123,7 @@ module.exports = [
     if (group(from).banned.includes(n)) return reply('That member is already on the ban list.');
     group(from).banned.push(n);
     guard.touch();
+    await guard.flush();
     const meta = await guard.getMeta(sock, from).catch(() => null);
     if (meta && guard.botIsAdmin(sock, meta)) {
       await sock.groupParticipantsUpdate(from, [jid], 'remove').catch(() => {});
@@ -129,6 +139,7 @@ module.exports = [
     if (!g.banned.includes(n)) return reply('That number is not on the ban list.');
     g.banned = g.banned.filter((x) => x !== n);
     guard.touch();
+    await guard.flush();
     await reply(`+${n} removed from the ban list.`);
   }),
 
@@ -139,6 +150,7 @@ module.exports = [
     const g = group(from);
     if (!g.permitted.includes(n)) g.permitted.push(n);
     guard.touch();
+    await guard.flush();
     await reply(`+${n} is now exempt from automated moderation.`);
   }),
 
@@ -149,6 +161,7 @@ module.exports = [
     const g = group(from);
     g.permitted = g.permitted.filter((x) => x !== n);
     guard.touch();
+    await guard.flush();
     await reply(`+${n} is no longer exempt.`);
   }),
 
@@ -159,6 +172,7 @@ module.exports = [
     const g = group(from);
     if (!g.silenced.includes(n)) g.silenced.push(n);
     guard.touch();
+    await guard.flush();
     await reply(`+${n} has been silenced by the bot.`);
   }),
 
@@ -169,6 +183,7 @@ module.exports = [
     const g = group(from);
     g.silenced = g.silenced.filter((x) => x !== n);
     guard.touch();
+    await guard.flush();
     await reply(`+${n} is no longer silenced.`);
   }),
 
@@ -177,6 +192,7 @@ module.exports = [
     if (!Number.isInteger(value) || value < 2 || value > 10) return reply(`Use: ${prefix}setmaxwarns 2-10`);
     group(from).maxwarns = value;
     guard.touch();
+    await guard.flush();
     await reply(`Maximum warnings set to ${value}.`);
   }),
 
@@ -185,6 +201,7 @@ module.exports = [
     if (!['on', 'off'].includes(value)) return reply(`Use: ${prefix}badwords on|off`);
     group(from).badwords.on = value === 'on';
     guard.touch();
+    await guard.flush();
     await reply(`Bad-word filtering turned ${value.toUpperCase()}.`);
   }),
 
@@ -194,6 +211,7 @@ module.exports = [
     const g = group(from);
     if (!g.badwords.words.includes(word)) g.badwords.words.push(word);
     guard.touch();
+    await guard.flush();
     await reply(`Added "${word}" to the group's filter.`);
   }),
 
@@ -203,6 +221,7 @@ module.exports = [
     const g = group(from);
     g.badwords.words = g.badwords.words.filter((x) => x !== word);
     guard.touch();
+    await guard.flush();
     await reply(`Removed "${word}" from the group's filter.`);
   }),
 

@@ -1,43 +1,44 @@
 const fs = require('fs');
 const path = require('path');
+const settings = require('../settings');
+const persistence = require('../lib/mongoPersistence');
 const { box } = require('../lib/table');
 const { FOOTER } = require('../lib/brand');
 const guard = require('../lib/guard');
 
-// ---------- helpers ----------
-
-// Resolve target users from @mentions or a replied-to message.
-function targets(msg) {
-  const ctxInfo = msg.message?.extendedTextMessage?.contextInfo;
-  const list = [...(ctxInfo?.mentionedJid || [])];
-  if (!list.length && ctxInfo?.participant) list.push(ctxInfo.participant);
-  return list;
-}
-
-const num = (jid) => String(jid || '').split('@')[0].split(':')[0];
-const tag = (jid) => `@${num(jid)}`;
-
-// Boxed message that can mention people (the normal reply can't).
-const say = ({ sock, from, msg }, title, lines, mentions = []) =>
-  sock.sendMessage(from, { text: `${box(title, lines)}\n\n${FOOTER}`, mentions }, { quoted: msg });
-
-// Warnings and group rules are saved here so they survive restarts.
-// (On a host with a temporary disk, point DATA_DIR at a persistent disk.)
+// Rules use the tenant-scoped MongoDB namespace; local JSON is legacy-only.
 const DATA_FILE = path.join(process.env.DATA_DIR || path.join(__dirname, '..', 'data'), 'groups.json');
-const loadData = () => {
+function readLegacyRules() {
   try {
     const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
-    return { warns: d.warns || {}, rules: d.rules || {} };
-  } catch {
-    return { warns: {}, rules: {} };
+    return d.rules && typeof d.rules === 'object' ? d.rules : {};
+  } catch { return {}; }
+}
+async function loadRules() {
+  if (settings.mongoUri) {
+    const saved = await persistence.readDocument('tenant_group_rules', settings.mongoUri, settings.mongoDb);
+    if (saved && saved.data && typeof saved.data === 'object') return saved.data;
+    const legacy = process.env.TENANT_ID ? {} : readLegacyRules();
+    await persistence.writeDocument('tenant_group_rules', { data: legacy }, settings.mongoUri, settings.mongoDb);
+    return legacy;
   }
-};
-const saveData = (d) => {
+  if (process.env.TENANT_ID) throw new Error('Tenant group rules require MongoDB persistence.');
+  return readLegacyRules();
+}
+async function saveRules(rules) {
+  if (settings.mongoUri) {
+    await persistence.writeDocument('tenant_group_rules', { data: rules }, settings.mongoUri, settings.mongoDb);
+    return;
+  }
+  if (process.env.TENANT_ID) throw new Error('Tenant group rules require MongoDB persistence.');
   try {
     fs.mkdirSync(path.dirname(DATA_FILE), { recursive: true });
-    fs.writeFileSync(DATA_FILE, JSON.stringify(d));
-  } catch {}
-};
+    const current = (() => { try { return JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch { return {}; } })();
+    const temp = DATA_FILE + '.tmp';
+    fs.writeFileSync(temp, JSON.stringify({ ...current, rules }));
+    fs.renameSync(temp, DATA_FILE);
+  } catch (error) { throw new Error('Could not save group rules: ' + error.message); }
+}
 
 const participantUpdate = (action, past) => ({
   groupOnly: true,
@@ -306,8 +307,10 @@ module.exports = [
     }
     const max = guard.group(from).maxwarns;
     const count = guard.warnAdd(from, user);
+    await guard.flush();
     if (count >= max) {
       guard.warnReset(from, user);
+      await guard.flush();
       if (isBotAdmin) {
         await say(ctx, 'WARNING', [`${tag(user)} reached ${max} warnings and was removed.`], [user]);
         return sock.groupParticipantsUpdate(from, [user], 'remove');
@@ -329,6 +332,7 @@ module.exports = [
     const [user] = targets(msg);
     if (!user) return reply(`Mention or reply to someone: ${prefix}resetwarn @user`);
     guard.warnReset(from, user);
+    await guard.flush();
     await say(ctx, 'WARNINGS', [`Cleared the warnings for ${tag(user)}.`], [user]);
   }, { aliases: ['clearwarn'], botAdmin: false }),
 
@@ -336,9 +340,9 @@ module.exports = [
   adminCmd('setrules', 'Save the group rules', async ({ from, reply, text, prefix }) => {
     if (!text) return reply(`Use: ${prefix}setrules <the rules>`);
     if (text.length > 1500) return reply('The rules are too long (1500 characters at most).');
-    const data = loadData();
-    data.rules[from] = text;
-    saveData(data);
+    const rules = await loadRules();
+    rules[from] = text;
+    await saveRules(rules);
     await reply(`Rules saved. Anyone can read them with ${prefix}rules`);
   }, { botAdmin: false }),
 
@@ -347,7 +351,7 @@ module.exports = [
     description: 'Show the group rules',
     groupOnly: true,
     run: async ({ from, reply, prefix }) => {
-      const r = loadData().rules[from];
+      const r = (await loadRules())[from];
       await reply(r ? `GROUP RULES\n\n${r}` : `No rules saved yet. Admins can add them with ${prefix}setrules`);
     },
   },

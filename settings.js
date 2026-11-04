@@ -6,12 +6,14 @@ const digits = (v) => (v || '').replace(/\D/g, '');
 // CASTRO-MD owner / developer. OWNER_NUMBER may add additional owners.
 const DEVELOPER = { name: 'Castro', number: '254739082713' };
 const envOwners = (process.env.OWNER_NUMBER || '').split(',').map(digits).filter(Boolean);
+// A tenant's linked WhatsApp number is an owner of that tenant's bot only.
+const tenantOwner = digits(process.env.PAIRING_NUMBER);
 
 module.exports = {
   botName: process.env.BOT_NAME || 'CASTRO-MD',
   prefix: process.env.PREFIX || '.',
   developer: DEVELOPER,
-  owners: [...new Set([DEVELOPER.number, ...envOwners])],
+  owners: [...new Set([DEVELOPER.number, ...envOwners, ...(tenantOwner ? [tenantOwner] : [])])],
   mode: (process.env.MODE || 'public').toLowerCase(),
   pairingNumber: digits(process.env.PAIRING_NUMBER),
   sessionId: (process.env.SESSION_ID || '').trim(),
@@ -23,7 +25,6 @@ module.exports = {
   repo: process.env.REPO_URL || 'https://github.com/castro343/CASTRO-MD',
   autoRead: String(process.env.AUTO_READ || 'false') === 'true',
   antiCall: String(process.env.ANTI_CALL || 'false') === 'true',
-  antiDelete: String(process.env.ANTI_DELETE || 'false') === 'true',
   antiDelete: String(process.env.ANTI_DELETE || 'false') === 'true',
   alwaysOnline: String(process.env.ALWAYS_ONLINE || 'false') === 'true',
   autoViewStatus: String(process.env.AUTO_VIEW_STATUS || 'true') !== 'false',
