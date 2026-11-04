@@ -179,6 +179,24 @@ const server = http.createServer(async (req, res) => {
   });
 if (!tenantId) if (!tenantId) server.listen(settings.port, () => log.info(`Web server on port ${settings.port} (pair page at /pair)`));
 
+// Rehydrate previously linked customer bots after the platform manager starts.
+if (!tenantId) {
+  setTimeout(async () => {
+    try {
+      const registry = await getTenantRegistry();
+      const tenants = await registry.list({ limit: 500 });
+      for (const tenant of tenants) {
+        if (tenant.status === 'connected' || tenant.status === 'disconnected') {
+          launchTenant(tenant, '');
+          log.info(`Restoring customer bot worker ${tenant.id}`);
+        }
+      }
+    } catch (e) {
+      log.error('Could not restore customer bot workers:', e.message);
+    }
+  }, 5000).unref();
+}
+
 // WhatsApp alert to you (the linked account and any OWNER_NUMBER) whenever the bot connects.
 // A 2-minute cooldown prevents spam if the connection keeps flapping.
 let lastAlert = 0;
