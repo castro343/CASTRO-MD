@@ -98,3 +98,15 @@ test('connection updates affect only the addressed tenant', async () => {
   assert.equal(docs.get(a.id).status, 'connected');
   assert.equal(docs.get(b.id).status, 'provisioning');
 });
+
+const { namespaceId } = require('../lib/mongoAuth');
+
+test('Mongo auth namespaces preserve owner compatibility and isolate tenant keys', () => {
+  const tenantA = 'a'.repeat(32);
+  const tenantB = 'b'.repeat(32);
+
+  assert.equal(namespaceId('default', 'creds'), 'creds');
+  assert.equal(namespaceId(tenantA, 'creds'), `${tenantA}:creds`);
+  assert.notEqual(namespaceId(tenantA, 'pre-key-1'), namespaceId(tenantB, 'pre-key-1'));
+  assert.throws(() => namespaceId('../other', 'creds'), /Invalid session namespace/);
+});
