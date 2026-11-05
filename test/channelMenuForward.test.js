@@ -7,6 +7,7 @@ const {
   channelCode,
   messageText,
   findNewsletterMessage,
+  buildChannelForwardContent,
 } = require('../lib/channelMenuForward');
 
 const proto = {
