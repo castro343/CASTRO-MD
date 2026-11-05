@@ -81,7 +81,7 @@ function buildMenu({ commands, prefix, settings, number, channelLink }) {
   });
   const total = seen.size;
   const header = box(settings.botName.toUpperCase(), [
-    `👋 Hey @${number}`,
+    number ? `👋 Hey @${number}` : '👋 Welcome to CASTRO-MD',
     `👤 Owner: ${settings.developer.name}`,
     `⌨️ Prefix: [ ${prefix} ]`,
     `🌍 Mode: ${settings.mode}`,
@@ -105,7 +105,7 @@ module.exports = [
     name: 'menu',
     aliases: ['help', 'commands', 'fullmenu', 'allmenu', 'list'],
     description: 'Show every command in one list, with the bot picture',
-    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, channelLink, args }) => {
+    run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, channelLink, args, forwardChannelMenu }) => {
       // ".menu <command>": what one command does.
       const want = (args[0] || '').toLowerCase().replace(prefix, '');
       if (want && want !== 'all') {
@@ -119,6 +119,18 @@ module.exports = [
             ['Who', c.ownerOnly ? 'owner only' : c.adminOnly ? 'group admins' : 'everyone'],
           ])
         );
+      }
+
+      if (typeof forwardChannelMenu === 'function') {
+        try {
+          const sent = await forwardChannelMenu(from, msg);
+          if (sent) {
+            await sendMenuVoice(sock, from);
+            return;
+          }
+        } catch (error) {
+          console.warn('[MENU] Channel post unavailable; using regular menu:', error.message);
+        }
       }
 
       const number = String(sender || '').split('@')[0].split(':')[0];
@@ -278,4 +290,10 @@ module.exports = [
     },
   },
 ];
-                            
+
+// Build a requester-independent menu for the official Channel.
+module.exports.buildChannelMenu = ({ commands, prefix, settings, channelLink }) => {
+  const { header, sections, footer } = buildMenu({ commands, prefix, settings, number: '', channelLink });
+  return { text: `${header}\\n\\n${sections.join('\\n\\n')}\\n\\n${footer}` };
+};
+module.exports.getPicture = getPicture;
