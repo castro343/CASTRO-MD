@@ -6,6 +6,8 @@
 
 *Black • Gold • Electric Blue*
 
+![CASTRO-MD WhatsApp Bot](https://user52126.na.imgto.link/public/20261105/0f20c6dde9f569aeadb696a5-712532.avif)
+
 [Repository](https://github.com/castro343/CASTRO-MD) · [Issues](https://github.com/castro343/CASTRO-MD/issues)
 
 </div>
