@@ -49,11 +49,11 @@ test('reconstructs only a real server-addressed newsletter message matching the 
   const response = {
     tag: 'iq',
     attrs: {},
-    content: [{ tag: 'message_updates', attrs: {}, content: [nodeFor('REAL_SERVER_123', caption)] }],
+    content: [{ tag: 'message_updates', attrs: {}, content: [nodeFor('123456', caption)] }],
   };
   const result = findNewsletterMessage(response, proto, '12345@newsletter', hash);
   assert.equal(result.key.remoteJid, '12345@newsletter');
-  assert.equal(result.key.id, 'REAL_SERVER_123');
+  assert.equal(result.key.id, '123456');
   assert.equal(result.key.fromMe, false);
   assert.equal(result.message.imageMessage.caption, caption);
 });
@@ -63,7 +63,7 @@ test('does not accept a different post or a missing server message ID', () => {
   const hash = crypto.createHash('sha256').update(caption).digest('hex');
   const different = {
     tag: 'iq', attrs: {},
-    content: [{ tag: 'message_updates', attrs: {}, content: [nodeFor('REAL_SERVER_456', 'unrelated post')] }],
+    content: [{ tag: 'message_updates', attrs: {}, content: [nodeFor('123457', 'unrelated post')] }],
   };
   const noId = {
     tag: 'iq', attrs: {},
@@ -77,16 +77,16 @@ test('does not accept a different post or a missing server message ID', () => {
 });
 
 test('adds native Channel attribution using the verified server message ID', () => {
-  const posted = { key: { id: 'SERVER_123' }, message: { imageMessage: { caption: 'CASTRO-MD menu' } } };
+  const posted = { key: { id: '123456' }, message: { imageMessage: { caption: 'CASTRO-MD menu' } } };
   const forwarded = buildChannelForwardContent(
     posted,
-    { jid: '12345@newsletter', name: 'CASTRO-MD Official Channel', serverMessageId: 'SERVER_123' },
+    { jid: '12345@newsletter', name: 'CASTRO-MD Official Channel', serverMessageId: 123456 },
     () => ({ imageMessage: { caption: 'CASTRO-MD menu', contextInfo: { forwardingScore: 1, isForwarded: true } } })
   );
   assert.deepEqual(forwarded.imageMessage.contextInfo.forwardedNewsletterMessageInfo, {
     newsletterJid: '12345@newsletter',
     newsletterName: 'CASTRO-MD Official Channel',
-    serverMessageId: 'SERVER_123',
+    serverMessageId: 123456,
   });
   assert.equal(forwarded.imageMessage.contextInfo.isForwarded, true);
 });
