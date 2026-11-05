@@ -517,9 +517,23 @@ async function start() {
       // Channel posts arrive as live newsletter events; capture the server-assigned
       // ID and exact protobuf before normal command handling can ignore them.
       if (String(msg.key?.remoteJid || '').endsWith('@newsletter')) {
+        const channelMessage = require('./lib/channelMenuForward');
+        const messageShape = Object.keys(msg.message || {});
+        const textLength = channelMessage.messageText(msg).length;
+        log.info('[CHANNEL MENU] Live newsletter event received:', JSON.stringify({
+          remoteJid: msg.key?.remoteJid || null,
+          messageIdPresent: !!msg.key?.id,
+          messageIdType: typeof msg.key?.id,
+          fromMe: !!msg.key?.fromMe,
+          upsertType: type || null,
+          messageShape,
+          textLength,
+          timestampPresent: !!msg.messageTimestamp,
+        }));
         try {
-          const captured = await require('./lib/channelMenuForward').captureChannelMenuPost(msg, settings);
+          const captured = await channelMessage.captureChannelMenuPost(msg, settings);
           if (captured) log.info('[CHANNEL MENU] Captured published Channel post from live event.');
+          else log.info('[CHANNEL MENU] Newsletter event did not match the pending menu post.');
         } catch (error) {
           log.warn('[CHANNEL MENU] Could not capture live Channel post:', error.message);
         }
