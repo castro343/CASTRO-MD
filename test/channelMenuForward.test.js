@@ -75,3 +75,18 @@ test('does not accept a different post or a missing server message ID', () => {
   assert.equal(findNewsletterMessage(different, proto, '12345@newsletter', hash), null);
   assert.equal(findNewsletterMessage(noId, proto, '12345@newsletter', hash), null);
 });
+
+test('adds native Channel attribution using the verified server message ID', () => {
+  const posted = { key: { id: 'SERVER_123' }, message: { imageMessage: { caption: 'CASTRO-MD menu' } } };
+  const forwarded = buildChannelForwardContent(
+    posted,
+    { jid: '12345@newsletter', name: 'CASTRO-MD Official Channel', serverMessageId: 'SERVER_123' },
+    () => ({ imageMessage: { caption: 'CASTRO-MD menu', contextInfo: { forwardingScore: 1, isForwarded: true } } })
+  );
+  assert.deepEqual(forwarded.imageMessage.contextInfo.forwardedNewsletterMessageInfo, {
+    newsletterJid: '12345@newsletter',
+    newsletterName: 'CASTRO-MD Official Channel',
+    serverMessageId: 'SERVER_123',
+  });
+  assert.equal(forwarded.imageMessage.contextInfo.isForwarded, true);
+});
