@@ -294,6 +294,6 @@ module.exports = [
 // Build a requester-independent menu for the official Channel.
 module.exports.buildChannelMenu = ({ commands, prefix, settings, channelLink }) => {
   const { header, sections, footer } = buildMenu({ commands, prefix, settings, number: '', channelLink });
-  return { text: `${header}\\n\\n${sections.join('\\n\\n')}\\n\\n${footer}` };
+  return { text: `${header}\n\n${sections.join('\n\n')}\n\n${footer}` };
 };
 module.exports.getPicture = getPicture;
