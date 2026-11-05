@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const {
   channelCode,
   messageText,
+  lookupSinceSeconds,
   findNewsletterMessage,
   buildChannelForwardContent,
 } = require('../lib/channelMenuForward');
@@ -44,6 +45,12 @@ test('reads captions from decoded newsletter messages', () => {
   assert.equal(messageText({ message: { imageMessage: { caption: 'CASTRO-MD menu' } } }), 'CASTRO-MD menu');
 });
 
+test('converts persisted millisecond timestamps to Unix seconds for Baileys', () => {
+  assert.equal(lookupSinceSeconds(1793904561000), 1793903661);
+  assert.equal(lookupSinceSeconds(1793904561), 1793903661);
+  assert.equal(lookupSinceSeconds(0), 0);
+});
+
 test('reconstructs only a real server-addressed newsletter message matching the menu', () => {
   const caption = 'CASTRO-MD menu';
   const hash = crypto.createHash('sha256').update(caption).digest('hex');
@@ -77,7 +84,7 @@ test('does not accept a different post or a missing server message ID', () => {
   assert.equal(findNewsletterMessage(noId, proto, '12345@newsletter', hash), null);
 });
 
-test('adds native Channel attribution using the verified server message ID', () => {
+test('adds native Channel attribution using the verified numeric server message ID', () => {
   const posted = { key: { id: '123456' }, message: { imageMessage: { caption: 'CASTRO-MD menu' } } };
   const forwarded = buildChannelForwardContent(
     posted,
