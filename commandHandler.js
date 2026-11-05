@@ -120,12 +120,7 @@ async function forwardChannelMenu(sock, to, quoted) {
 
 // Look the channel up ahead of time (called when the bot connects), so the first reply is not slow.
 const warm = (sock) => {
-  if (settings.forwarded) getChannel(sock).catch(() => {});
-  try {
-    require('./Cmds/general').warmPicture?.(sock, settings);
-  } catch {
-    // the menu still works without it
-  }
+  prepareChannelMenu(sock).catch((error) => log.warn('[MENU] Channel preparation failed:', error.message));
 };
 
 // When forwarding is on, replies show "Forwarded many times", and look like they
@@ -292,7 +287,8 @@ async function handle(sock, msg) {
     sock, msg, from, sender, isGroup, isOwner, args,
     text: args.join(' '), command: rawName.toLowerCase(), reply,
     prefix: settings.prefix, commands: unique, settings,
-    fwd: () => fwd(sock), channel: () => getChannel(sock), channelLink: channelLink(), botNumber,
+    fwd: () => fwd(sock), channel: () => getChannel(sock), channelLink: channelLink(),
+    forwardChannelMenu: (to, quoted) => forwardChannelMenu(sock, to, quoted), botNumber,
   };
 
   try {
