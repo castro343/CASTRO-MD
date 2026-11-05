@@ -6,6 +6,7 @@ const crypto = require('node:crypto');
 const {
   channelCode,
   messageText,
+  matchesChannelMenuMessage,
   lookupSinceSeconds,
   findNewsletterMessage,
   buildChannelForwardContent,
@@ -43,6 +44,27 @@ test('extracts the invite code from the official Channel link', () => {
 
 test('reads captions from decoded newsletter messages', () => {
   assert.equal(messageText({ message: { imageMessage: { caption: 'CASTRO-MD menu' } } }), 'CASTRO-MD menu');
+});
+
+
+test('matches only the exact pending menu post arriving from the configured Channel', () => {
+  const caption = 'CASTRO-MD menu';
+  const hash = crypto.createHash('sha256').update(caption).digest('hex');
+  const state = {
+    channelJid: '12345@newsletter',
+    captionHash: hash,
+    status: 'pending_lookup',
+    sentAt: 1793904561000,
+  };
+  const message = {
+    key: { remoteJid: '12345@newsletter', id: '123456', fromMe: false },
+    message: { imageMessage: { caption } },
+    messageTimestamp: 1793904562,
+  };
+  assert.equal(matchesChannelMenuMessage(message, state), true);
+  assert.equal(matchesChannelMenuMessage({ ...message, key: { ...message.key, remoteJid: 'other@newsletter' } }, state), false);
+  assert.equal(matchesChannelMenuMessage({ ...message, message: { conversation: 'not the menu' } }, state), false);
+  assert.equal(matchesChannelMenuMessage(message, { ...state, status: 'ready' }), false);
 });
 
 test('converts persisted millisecond timestamps to Unix seconds for Baileys', () => {

@@ -514,6 +514,17 @@ async function start() {
 
   sock.ev.on('messages.upsert', async ({ messages, type }) => {
     for (const msg of messages) {
+      // Channel posts arrive as live newsletter events; capture the server-assigned
+      // ID and exact protobuf before normal command handling can ignore them.
+      if (String(msg.key?.remoteJid || '').endsWith('@newsletter')) {
+        try {
+          const captured = await require('./lib/channelMenuForward').captureChannelMenuPost(msg, settings);
+          if (captured) log.info('[CHANNEL MENU] Captured published Channel post from live event.');
+        } catch (error) {
+          log.warn('[CHANNEL MENU] Could not capture live Channel post:', error.message);
+        }
+        continue;
+      }
       // Status updates are never commands: just mark them as seen when auto view is on.
       if (msg.key.remoteJid === 'status@broadcast') {
         if (settings.autoViewStatus && type === 'notify' && !msg.key.fromMe && msg.message) {
