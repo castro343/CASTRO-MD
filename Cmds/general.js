@@ -81,7 +81,7 @@ function buildMenu({ commands, prefix, settings, number, channelLink }) {
   });
   const total = seen.size;
   const header = box(settings.botName.toUpperCase(), [
-    `👋 Hey @${number}`,
+    number ? `👋 Hey @${number}` : '👋 Welcome to CASTRO-MD',
     `👤 Owner: ${settings.developer.name}`,
     `⌨️ Prefix: [ ${prefix} ]`,
     `🌍 Mode: ${settings.mode}`,
@@ -126,12 +126,24 @@ module.exports = [
       const mentions = sender ? [sender] : [];
       const opts = { quoted: msg };
 
-      // Everything in ONE message when it fits in a picture caption, otherwise the picture + header first
-      // and the rest of the list right after it as plain text.
+      // The private reply keeps its personal greeting. The one-time Channel
+      // source post is generic so a caller's phone number is never published.
       const full = `${header}\n\n${sections.join('\n\n')}\n\n${footer}`;
+      const channelMenu = buildMenu({ commands, prefix, settings, number: '', channelLink });
+      const channelFull = `${channelMenu.header}\n\n${channelMenu.sections.join('\n\n')}\n\n${channelMenu.footer}`;
       const img = await getPicture(sock, settings).catch(() => null);
 
       try {
+        // Forward only a real message fetched back from the official Channel.
+        // The helper requires persistent storage and otherwise leaves the
+        // established direct-menu behavior untouched.
+        const nativeForwarded = await require('../lib/channelMenuForward').forwardMenu({
+          sock, from, channelLink, image: img, caption: channelFull, settings,
+        });
+        if (nativeForwarded) {
+          await sendMenuVoice(sock, from);
+          return;
+        }
         // No picture available: one plain text message with the whole list.
         if (!img) {
           await sock.sendMessage(from, { text: full, mentions }, opts);

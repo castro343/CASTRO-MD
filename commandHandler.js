@@ -32,14 +32,12 @@ const DEFAULT_CHANNEL_LINK = 'https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBa
 const channelLink = () => settings.channelLink || DEFAULT_CHANNEL_LINK;
 const channelCode = () => (channelLink().match(/channel\/([A-Za-z0-9_-]+)/) || [])[1];
 
-// Name shown on every forwarded reply ("Forwarded from ...").
-const FORWARD_NAME = 'CASTRO-MD';
-
-// Look up the channel's ID once and remember it. If the lookup fails, wait a minute before retrying
-// so every reply doesn't pay for a failed request.
+// Channel identity lookup is used by channel-aware commands. Do not synthesize
+// forwardedNewsletterMessageInfo: WhatsApp requires a real server-assigned Channel
+// message ID, and a fabricated ID can produce misleading attribution.
 let channelInfo = null;
 let channelFailed = { code: null, at: 0 };
-let channelPending = null; // one lookup at a time, shared by every reply waiting on it
+let channelPending = null;
 async function getChannel(sock) {
   const code = channelCode();
   if (channelInfo && channelInfo.code === code) return channelInfo;
@@ -47,11 +45,13 @@ async function getChannel(sock) {
   if (!channelPending) {
     channelPending = (async () => {
       try {
-        // Never let this lookup hold up replies for more than a few seconds.
         const m = await Promise.race([
           sock.newsletterMetadata('invite', code),
           new Promise((_, reject) => setTimeout(() => reject(new Error('timed out')), 4000)),
         ]);
+        if (!m?.id || !String(m.id).endsWith('@newsletter')) {
+          throw new Error('WhatsApp did not return a valid Channel JID');
+        }
         channelInfo = { code, jid: m.id, name: m.name || '' };
       } catch (e) {
         channelFailed = { code, at: Date.now() };
@@ -65,9 +65,8 @@ async function getChannel(sock) {
   return channelPending;
 }
 
-// Look the channel up ahead of time (called when the bot connects), so the first reply is not slow.
 const warm = (sock) => {
-  if (settings.forwarded) getChannel(sock).catch(() => {});
+  getChannel(sock).catch(() => {});
   try {
     require('./Cmds/general').warmPicture?.(sock, settings);
   } catch {
@@ -75,23 +74,10 @@ const warm = (sock) => {
   }
 };
 
-// When forwarding is on, replies show "Forwarded many times", and look like they
-// came from your channel (shown as CASTRO-MD) if the channel could be loaded.
-async function fwd(sock) {
-  if (!settings.forwarded) return {};
-  const contextInfo = { isForwarded: true, forwardingScore: 999 };
-  // Never make a reply wait for the channel lookup: use it if it is ready, otherwise load it in the background.
-  const ready = channelInfo && channelInfo.code === channelCode() ? channelInfo : null;
-  if (!ready) getChannel(sock).catch(() => {});
-  const c = ready;
-  if (c) {
-    contextInfo.forwardedNewsletterMessageInfo = {
-      newsletterJid: c.jid,
-      newsletterName: FORWARD_NAME,
-      serverMessageId: -1,
-    };
-  }
-  return { contextInfo };
+// Generic replies must not claim to be Channel forwards. The native menu-forward
+// path will attach attribution only after it has a verified server message ID.
+async function fwd() {
+  return {};
 }
 
 // Group info is cached for a minute, so admin-only commands don't wait on WhatsApp each time.
