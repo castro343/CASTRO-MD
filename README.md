@@ -4,7 +4,7 @@
 
 **A modular WhatsApp automation bot built with Baileys.**
 
-*Black • Gold • Electric Blue*
+*sema.walai.nimejaa.ngori 😶‍🌫️*
 
 ![CASTRO-MD WhatsApp Bot](https://user52126.na.imgto.link/public/20261105/0f20c6dde9f569aeadb696a5-712532.avif)
 
