@@ -65,14 +65,62 @@ async function getChannel(sock) {
   return channelPending;
 }
 
+let channelMenuSocket = null;
+let channelMenuPost = null;
+let channelMenuCode = null;
+let channelMenuPending = null;
+let channelMenuFailedAt = 0;
+
+async function prepareChannelMenu(sock) {
+  const code = channelCode();
+  if (!code) throw new Error('Invalid official Channel invite link');
+  if (channelMenuSocket !== sock) {
+    channelMenuSocket = sock;
+    channelMenuPost = null;
+    channelMenuCode = null;
+    channelMenuPending = null;
+    channelMenuFailedAt = 0;
+  }
+  if (channelMenuPost && channelMenuCode === code) return channelMenuPost;
+  if (channelMenuPending) return channelMenuPending;
+  if (channelMenuFailedAt && Date.now() - channelMenuFailedAt < 60000) return null;
+  channelMenuPending = (async () => {
+    try {
+      const info = await getChannel(sock);
+      if (!info?.jid) throw new Error('Channel metadata unavailable');
+      const general = require('./Cmds/general');
+      const menu = general.buildChannelMenu({ commands: unique, prefix: settings.prefix, settings, channelLink: channelLink() });
+      const image = await general.getPicture(sock, settings).catch(() => null);
+      const content = image && menu.text.length <= 3500 ? { image, caption: menu.text } : { text: menu.text };
+      const post = await sock.sendMessage(info.jid, content);
+      if (!post?.key?.id || !post?.message) throw new Error('Channel post was not confirmed by Baileys');
+      channelMenuPost = post;
+      channelMenuCode = code;
+      channelMenuFailedAt = 0;
+      log.info('[MENU] Published reusable Channel menu');
+      return post;
+    } catch (error) {
+      channelMenuFailedAt = Date.now();
+      log.error('[MENU] Channel menu publish failed:', error.message);
+      return null;
+    } finally {
+      channelMenuPending = null;
+    }
+  })();
+  return channelMenuPending;
+}
+
+async function forwardChannelMenu(sock, to, quoted) {
+  const post = await prepareChannelMenu(sock);
+  if (!post) return false;
+  await sock.sendMessage(to, { forward: post }, quoted ? { quoted } : {});
+  log.info('[MENU] Forwarded cached Channel menu');
+  return true;
+}
+
 // Look the channel up ahead of time (called when the bot connects), so the first reply is not slow.
 const warm = (sock) => {
-  if (settings.forwarded) getChannel(sock).catch(() => {});
-  try {
-    require('./Cmds/general').warmPicture?.(sock, settings);
-  } catch {
-    // the menu still works without it
-  }
+  prepareChannelMenu(sock).catch((error) => log.warn('[MENU] Channel preparation failed:', error.message));
 };
 
 // When forwarding is on, replies show "Forwarded many times", and look like they
@@ -239,7 +287,8 @@ async function handle(sock, msg) {
     sock, msg, from, sender, isGroup, isOwner, args,
     text: args.join(' '), command: rawName.toLowerCase(), reply,
     prefix: settings.prefix, commands: unique, settings,
-    fwd: () => fwd(sock), channel: () => getChannel(sock), channelLink: channelLink(), botNumber,
+    fwd: () => fwd(sock), channel: () => getChannel(sock), channelLink: channelLink(),
+    forwardChannelMenu: (to, quoted) => forwardChannelMenu(sock, to, quoted), botNumber,
   };
 
   try {
