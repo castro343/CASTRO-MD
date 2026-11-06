@@ -7,6 +7,7 @@ const {
   withTimeout,
   channelCode,
   messageText,
+  channelMenuMatchReason,
   matchesChannelMenuMessage,
   findNewsletterMessage,
   buildChannelForwardContent,
@@ -32,6 +33,29 @@ function nodeFor(id, caption, timestamp = '1793900000') {
     }],
   };
 }
+
+
+test('reports the exact reason a live Channel menu event was rejected', () => {
+  const caption = 'CASTRO-MD menu';
+  const state = {
+    channelJid: '12345@newsletter',
+    status: 'publishing',
+    captionHash: crypto.createHash('sha256').update(caption).digest('hex'),
+    requestedAt: 1793900000000,
+  };
+  const valid = {
+    key: { remoteJid: '12345@newsletter', id: '123456' },
+    message: { imageMessage: { caption } },
+    messageTimestamp: 1793900000,
+  };
+  assert.equal(channelMenuMatchReason(valid, state), 'matched');
+  assert.equal(channelMenuMatchReason(valid, null), 'no_pending_state');
+  assert.equal(channelMenuMatchReason({ ...valid, key: { ...valid.key, remoteJid: '999@newsletter' } }, state), 'channel_jid_mismatch');
+  assert.equal(channelMenuMatchReason({ ...valid, message: { imageMessage: { caption: 'different post' } } }, state), 'caption_hash_mismatch');
+  assert.equal(channelMenuMatchReason({ ...valid, key: { ...valid.key, id: 'not-numeric' } }, state), 'invalid_server_message_id');
+  assert.equal(channelMenuMatchReason({ ...valid, message: {} }, state), 'missing_caption_or_text');
+  assert.equal(channelMenuMatchReason({ ...valid, messageTimestamp: 1793899800 }, state), 'message_timestamp_too_old');
+});
 
 test('extracts the official Channel invite code', () => {
   assert.equal(channelCode('https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBaB18'), '0029VbE0iWxEawdsY3dBaB18');

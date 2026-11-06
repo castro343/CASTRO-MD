@@ -532,8 +532,24 @@ async function start() {
         }));
         try {
           const captured = await channelMessage.captureChannelMenuPost(msg, settings);
-          if (captured) log.info('[CHANNEL MENU] Captured published Channel post from live event.');
-          else log.info('[CHANNEL MENU] Newsletter event did not match the pending menu post.');
+          if (captured) {
+            log.info('[CHANNEL MENU] Captured published Channel post from live event.');
+          } else {
+            const diagnostic = await channelMessage.diagnoseChannelMenuPost(msg, settings).catch((error) => ({
+              reason: 'diagnostic_read_failed',
+              error: error.message,
+            }));
+            log.info('[CHANNEL MENU] Newsletter event not captured:', JSON.stringify({
+              reason: diagnostic.reason,
+              stateStatus: diagnostic.stateStatus || null,
+              expectedChannel: diagnostic.expectedChannel || null,
+              receivedChannel: msg.key?.remoteJid || null,
+              messageIdPresent: !!msg.key?.id,
+              messageShape,
+              textLength,
+              timestampPresent: !!msg.messageTimestamp,
+            }));
+          }
         } catch (error) {
           log.warn('[CHANNEL MENU] Could not capture live Channel post:', error.message);
         }
