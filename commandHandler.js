@@ -196,7 +196,10 @@ async function handle(sock, msg) {
     senderNumbers.some((n) => settings.owners.includes(n) || botNumbers.includes(n));
 
 
-  if (settings.mode === 'private' && !isOwner) {
+  // The menu is intentionally public: every person who pairs a CASTRO-MD
+  // tenant must be able to discover and use it, even while owner-only mode is on.
+  // All other commands continue to respect private mode.
+  if (settings.mode === 'private' && !isOwner && cmd.name !== 'menu') {
     return log.info(`[CMD] ignored "${cmd.name}": mode is private and sender is not the owner (sender=${sender})`);
   }
   // How long the message waited before we got to it (WhatsApp delivery + queue), in seconds.
