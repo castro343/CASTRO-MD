@@ -120,6 +120,6 @@ test('refuses invalid Channel server IDs', () => {
   assert.throws(() => buildChannelForwardContent(
     posted,
     { jid: '12345@newsletter', name: 'CASTRO-MD', serverMessageId: -1 },
-    () => ({ conversation: 'menu' })
-  ), /server message ID/);
+    () => ({ extendedTextMessage: { text: 'menu' } })
+  ), /valid WhatsApp Channel server message ID/);
 });
