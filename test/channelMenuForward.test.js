@@ -11,6 +11,7 @@ const {
   matchesChannelMenuMessage,
   findNewsletterMessage,
   buildChannelForwardContent,
+  subscribeToChannelLiveUpdates,
 } = require('../lib/channelMenuForward');
 
 const proto = {
@@ -154,4 +155,29 @@ test('bounds slow Channel lookups instead of hanging menu requests', async () =>
     withTimeout(new Promise((resolve) => setTimeout(resolve, 50)), 5, 'Channel message lookup'),
     /Channel message lookup timed out after 5ms/
   );
+});
+
+
+test('follows the official Channel before enabling live updates', async () => {
+  const calls = [];
+  const sock = {
+    async newsletterFollow(jid) { calls.push(['follow', jid]); },
+    async subscribeNewsletterUpdates(jid) { calls.push(['subscribe', jid]); return { duration: '86400' }; },
+  };
+  const result = await subscribeToChannelLiveUpdates(sock, '12345@newsletter');
+  assert.deepEqual(calls, [
+    ['follow', '12345@newsletter'],
+    ['subscribe', '12345@newsletter'],
+  ]);
+  assert.deepEqual(result, { duration: '86400' });
+});
+
+test('continues live-update setup when WhatsApp says the Channel is already followed', async () => {
+  let subscribed = false;
+  const sock = {
+    async newsletterFollow() { throw new Error('Newsletter already followed'); },
+    async subscribeNewsletterUpdates() { subscribed = true; return null; },
+  };
+  await subscribeToChannelLiveUpdates(sock, '12345@newsletter');
+  assert.equal(subscribed, true);
 });
