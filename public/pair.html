@@ -20,7 +20,12 @@
     .card{width:min(100%,460px);padding:34px;border:1px solid #293448;border-radius:24px;background:linear-gradient(145deg,rgba(20,29,43,.97),rgba(10,14,22,.97));box-shadow:0 24px 90px #0009}
     .mark{width:74px;height:74px;display:block;border-radius:20px;object-fit:cover;border:1px solid #8b62ff;box-shadow:0 0 30px #8b45ff55}
     h1{margin:22px 0 7px;font-size:29px;letter-spacing:.08em}
-    .sub{margin:0 0 26px;color:var(--muted);line-height:1.6}
+    .sub{margin:0 0 22px;color:var(--muted);line-height:1.6}
+    .stats{display:flex;align-items:center;gap:14px;margin:0 0 26px;padding:16px;border:1px solid #24527a;border-radius:16px;background:linear-gradient(110deg,#0b1c2b,#111a28)}
+    .stats-icon{width:42px;height:42px;display:grid;place-items:center;border-radius:12px;background:#28a9ff18;color:#65c6ff;font-size:22px}
+    .stats-label{color:var(--muted);font-size:11px;font-weight:800;letter-spacing:.12em}
+    .stats-number{margin-top:3px;color:#f4d58d;font-size:28px;font-weight:950;letter-spacing:.04em;font-variant-numeric:tabular-nums}
+    .stats-note{margin-left:auto;color:#6edca7;font-size:10px;font-weight:800;white-space:nowrap}
     label{display:block;margin:0 0 9px;font-size:13px;font-weight:700;color:#dce5f2}
     input{width:100%;padding:15px 16px;border:1px solid #34445a;border-radius:12px;background:#080e18;color:white;font-size:16px;outline:none}
     input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #28a9ff20}
@@ -40,6 +45,14 @@
     <img class="mark" src="/castro-md-icon.png" alt="CASTRO-MD app icon">
     <h1>CASTRO-MD</h1>
     <p class="sub">Link CASTRO-MD directly from WhatsApp. No session ID copying is required.</p>
+    <section class="stats" aria-label="Total successful pairings">
+      <div class="stats-icon" aria-hidden="true">🤝</div>
+      <div>
+        <div class="stats-label">TOTAL PAIRINGS MADE</div>
+        <div class="stats-number" id="pairingCount" aria-live="polite">—</div>
+      </div>
+      <div class="stats-note">● LIVE</div>
+    </section>
     <form id="pairForm">
       <label for="number">WhatsApp number with country code</label>
       <input id="number" name="number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="2547XXXXXXXX" required minlength="8" maxlength="15">
@@ -57,6 +70,29 @@
   </main>
   <script>
     if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
+    const pairingCount=document.getElementById('pairingCount');
+    let displayedPairings=0;
+    const formatCount=value=>new Intl.NumberFormat().format(value);
+    async function refreshPairingCount(){
+      try{
+        const response=await fetch('/api/stats',{cache:'no-store'});
+        if(!response.ok)throw new Error('Stats unavailable');
+        const data=await response.json();
+        const target=Math.max(0,Number(data.totalPairings)||0);
+        if(target===displayedPairings){pairingCount.textContent=formatCount(target);return;}
+        const start=displayedPairings, began=performance.now(), duration=850;
+        function animate(now){
+          const progress=Math.min(1,(now-began)/duration);
+          const eased=1-Math.pow(1-progress,3);
+          pairingCount.textContent=formatCount(Math.round(start+(target-start)*eased));
+          if(progress<1)requestAnimationFrame(animate);
+          else displayedPairings=target;
+        }
+        requestAnimationFrame(animate);
+      }catch(_){if(pairingCount.textContent==='—')pairingCount.textContent='—';}
+    }
+    refreshPairingCount();
+    setInterval(refreshPairingCount,30000);
     const form=document.getElementById('pairForm');
     const button=document.getElementById('submit');
     const error=document.getElementById('error');
