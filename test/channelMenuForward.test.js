@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
 const {
+  withTimeout,
   channelCode,
   messageText,
   matchesChannelMenuMessage,
@@ -122,4 +123,11 @@ test('refuses invalid Channel server IDs', () => {
     { jid: '12345@newsletter', name: 'CASTRO-MD', serverMessageId: -1 },
     () => ({ extendedTextMessage: { text: 'menu' } })
   ), /valid WhatsApp Channel server message ID/);
+});
+
+test('bounds slow Channel lookups instead of hanging menu requests', async () => {
+  await assert.rejects(
+    withTimeout(new Promise((resolve) => setTimeout(resolve, 50)), 5, 'Channel message lookup'),
+    /Channel message lookup timed out after 5ms/
+  );
 });
