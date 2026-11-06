@@ -211,7 +211,7 @@ const server = http.createServer(async (req, res) => {
     const pwaAssets = {
       '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
       '/sw.js': ['sw.js', 'application/javascript; charset=utf-8'],
-      '/icon.svg': ['icon.svg', 'image/svg+xml'],
+      '/castro-md-icon.png': ['castro-md-icon.png', 'image/png'],
     };
     if (pwaAssets[url.pathname]) {
       try {
