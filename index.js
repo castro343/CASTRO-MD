@@ -236,6 +236,16 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === '/api/stats') {
+      try {
+        const totalPairings = await (await getTenantRegistry()).getPairingCount();
+        return json(res, 200, { totalPairings });
+      } catch (e) {
+        log.error('Could not load public pairing statistics:', e.message);
+        return json(res, 503, { error: 'Pairing statistics are temporarily unavailable.' });
+      }
+    }
+
     if (url.pathname === '/api/pair') {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
