@@ -1,5 +1,5 @@
-const CACHE = 'castro-md-pwa-v1';
-const CORE = ['/pair', '/manifest.webmanifest', '/icon.svg'];
+const CACHE = 'castro-md-pwa-v2';
+const CORE = ['/pair', '/manifest.webmanifest', '/castro-md-icon.png'];
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(CORE)).then(() => self.skipWaiting()));
 });
