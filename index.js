@@ -591,8 +591,19 @@ async function start() {
         continue;
       }
       // Accept live messages, plus your own recent messages synced from your phone.
-      const age = Date.now() / 1000 - Number(String(msg.messageTimestamp || 0));
-      if (type !== 'notify' && !(type === 'append' && msg.key.fromMe && age < 60)) continue;
+      // WhatsApp may replay queued notify events after a reconnect. Never run commands,
+      // guards, or other automations for messages that are already stale.
+      const messageTimestamp = Number(String(msg.messageTimestamp || 0));
+      const age = messageTimestamp > 0 ? Date.now() / 1000 - messageTimestamp : Infinity;
+      if (type !== 'notify' && !(type === 'append' && msg.key.fromMe && age >= 0 && age < 60)) continue;
+      const MAX_MESSAGE_AGE_SECONDS = 120;
+      if (!msg.key.fromMe && age > MAX_MESSAGE_AGE_SECONDS) {
+        const body = getText(msg.message).trim();
+        if (body.startsWith(settings.prefix)) {
+          log.info(`[MSG] ignored stale command (${Math.round(age)}s old): from=${msg.key.remoteJid} text=\"${body.slice(0, 40)}\"`);
+        }
+        continue;
+      }
       // Cache only accepted live incoming messages so old history is not treated as current.
       cacheMessage(msg);
       if (getText(msg.message).startsWith(settings.prefix)) {
