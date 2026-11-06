@@ -26,7 +26,8 @@ function fakeMongo() {
             if (filter.status?.$in && !filter.status.$in.includes(doc.status)) return { matchedCount: 0 };
             if (filter.status?.$ne && doc.status === filter.status.$ne) return { matchedCount: 0 };
             Object.assign(doc, update.$set || {});
-            return { matchedCount: 1 };
+            for (const [key, value] of Object.entries(update.$inc || {})) doc[key] = (doc[key] || 0) + value;
+            return { matchedCount: 1, modifiedCount: 1 };
           },
           find() {
             let rows = [...docs.values()];
@@ -109,4 +110,26 @@ test('Mongo auth namespaces preserve owner compatibility and isolate tenant keys
   assert.equal(namespaceId(tenantA, 'creds'), `${tenantA}:creds`);
   assert.notEqual(namespaceId(tenantA, 'pre-key-1'), namespaceId(tenantB, 'pre-key-1'));
   assert.throws(() => namespaceId('../other', 'creds'), /Invalid session namespace/);
+});
+
+test('counts successful pairings once and counts a fresh re-pair after logout', async () => {
+  const { MongoClient, docs } = fakeMongo();
+  const registry = createTenantRegistry({ uri: 'mongodb://test', MongoClient });
+  const tenant = await registry.create('254700000007');
+
+  assert.equal(await registry.getPairingCount(), 0);
+  await registry.markConnected(tenant.id);
+  assert.equal(await registry.getPairingCount(), 1);
+
+  // Repeated connection events and worker restarts do not add another pairing.
+  await registry.markConnected(tenant.id);
+  await registry.markDisconnected(tenant.id);
+  await registry.markConnected(tenant.id);
+  assert.equal(await registry.getPairingCount(), 1);
+
+  // A logged-out account that successfully pairs again is a new pairing.
+  await registry.markNeedsPairing(tenant.id);
+  await registry.markConnected(tenant.id);
+  assert.equal(await registry.getPairingCount(), 2);
+  assert.equal(docs.get(tenant.id).pairings, 2);
 });
