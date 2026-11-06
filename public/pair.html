@@ -4,13 +4,21 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#080b12">
+  <meta name="description" content="CASTRO-MD WhatsApp companion and pairing app.">
+  <meta name="application-name" content="CASTRO-MD">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="CASTRO-MD">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/castro-md-icon.png" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="/castro-md-icon.png">
   <title>CASTRO-MD | Pair WhatsApp</title>
   <style>
     :root{color-scheme:dark;--bg:#080b12;--panel:#111722;--gold:#d9ad4b;--blue:#28a9ff;--muted:#9aa7b8}
     *{box-sizing:border-box}
     body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 15% 10%,#142c45 0,transparent 42%),radial-gradient(ellipse at 90% 85%,#342713 0,transparent 35%),var(--bg);font-family:Inter,system-ui,Arial,sans-serif;color:#f5f7fb}
     .card{width:min(100%,460px);padding:34px;border:1px solid #293448;border-radius:24px;background:linear-gradient(145deg,rgba(20,29,43,.97),rgba(10,14,22,.97));box-shadow:0 24px 90px #0009}
-    .mark{width:58px;height:58px;display:grid;place-items:center;border-radius:18px;background:linear-gradient(135deg,var(--gold),#7c5a20);color:#080b12;font-weight:950;font-size:25px;box-shadow:0 0 30px #d9ad4b33}
+    .mark{width:74px;height:74px;display:block;border-radius:20px;object-fit:cover;border:1px solid #8b62ff;box-shadow:0 0 30px #8b45ff55}
     h1{margin:22px 0 7px;font-size:29px;letter-spacing:.08em}
     .sub{margin:0 0 26px;color:var(--muted);line-height:1.6}
     label{display:block;margin:0 0 9px;font-size:13px;font-weight:700;color:#dce5f2}
@@ -29,7 +37,7 @@
 </head>
 <body>
   <main class="card">
-    <div class="mark">C</div>
+    <img class="mark" src="/castro-md-icon.png" alt="CASTRO-MD app icon">
     <h1>CASTRO-MD</h1>
     <p class="sub">Link CASTRO-MD directly from WhatsApp. No session ID copying is required.</p>
     <form id="pairForm">
@@ -48,6 +56,7 @@
     <p class="foot">BLACK • GOLD • ELECTRIC BLUE<br>Powered by Castro</p>
   </main>
   <script>
+    if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
     const form=document.getElementById('pairForm');
     const button=document.getElementById('submit');
     const error=document.getElementById('error');

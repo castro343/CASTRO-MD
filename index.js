@@ -207,6 +207,24 @@ async function requestTenantPairing(phone) {
 const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, 'http://localhost');
 
+    // Public PWA assets; keep this allowlist narrow.
+    const pwaAssets = {
+      '/manifest.webmanifest': ['manifest.webmanifest', 'application/manifest+json; charset=utf-8'],
+      '/sw.js': ['sw.js', 'application/javascript; charset=utf-8'],
+      '/castro-md-icon.png': ['castro-md-icon.png', 'image/png'],
+    };
+    if (pwaAssets[url.pathname]) {
+      try {
+        const [file, contentType] = pwaAssets[url.pathname];
+        const body = fs.readFileSync(path.join(__dirname, 'public', file));
+        res.writeHead(200, { 'Content-Type': contentType, 'Cache-Control': file === 'sw.js' ? 'no-cache' : 'public, max-age=3600' });
+        return res.end(body);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('PWA asset not found');
+      }
+    }
+
     if (url.pathname === '/pair' || url.pathname === '/pair.html') {
       try {
         const page = fs.readFileSync(path.join(__dirname, 'public', 'pair.html'));

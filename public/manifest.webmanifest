@@ -1,0 +1,13 @@
+{
+  "id": "/pair",
+  "name": "CASTRO-MD",
+  "short_name": "CASTRO-MD",
+  "description": "CASTRO-MD WhatsApp companion and pairing app",
+  "start_url": "/pair",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080b12",
+  "theme_color": "#080b12",
+  "icons": [{"src": "/castro-md-icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}]
+}
