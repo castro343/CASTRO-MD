@@ -2,121 +2,66 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const crypto = require('node:crypto');
 const {
   channelCode,
   messageText,
-  matchesChannelMenuMessage,
-  lookupSinceSeconds,
-  findNewsletterMessage,
+  captionHash,
+  validServerMessageId,
   buildChannelForwardContent,
 } = require('../lib/channelMenuForward');
 
-const proto = {
-  Message: {
-    decode(buffer) {
-      return JSON.parse(Buffer.from(buffer).toString('utf8'));
-    },
-  },
-  WebMessageInfo: {
-    fromObject(value) {
-      return value;
-    },
-  },
-};
-
-function nodeFor(id, caption, timestamp = '1793900000') {
-  return {
-    tag: 'message',
-    attrs: { message_id: id, t: timestamp },
-    content: [{
-      tag: 'plaintext',
-      attrs: {},
-      content: Buffer.from(JSON.stringify({ imageMessage: { caption } })),
-    }],
-  };
-}
-
-test('extracts the invite code from the official Channel link', () => {
-  assert.equal(channelCode('https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBaB18'), '0029VbE0iWxEawdsY3dBaB18');
+test('extracts the official WhatsApp Channel invite code', () => {
+  assert.equal(
+    channelCode('https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBaB18'),
+    '0029VbE0iWxEawdsY3dBaB18'
+  );
   assert.equal(channelCode('https://example.com/not-a-channel'), '');
 });
 
-test('reads captions from decoded newsletter messages', () => {
+test('reads captions from common WhatsApp message types', () => {
   assert.equal(messageText({ message: { imageMessage: { caption: 'CASTRO-MD menu' } } }), 'CASTRO-MD menu');
+  assert.equal(messageText({ message: { extendedTextMessage: { text: 'Menu text' } } }), 'Menu text');
+  assert.equal(messageText({ message: { conversation: 'Hello' } }), 'Hello');
 });
 
-
-test('matches only the exact pending menu post arriving from the configured Channel', () => {
-  const caption = 'CASTRO-MD menu';
-  const hash = crypto.createHash('sha256').update(caption).digest('hex');
-  const state = {
-    channelJid: '12345@newsletter',
-    captionHash: hash,
-    status: 'pending_lookup',
-    sentAt: 1793904561000,
-  };
-  const message = {
-    key: { remoteJid: '12345@newsletter', id: '123456', fromMe: false },
-    message: { imageMessage: { caption } },
-    messageTimestamp: 1793904562,
-  };
-  assert.equal(matchesChannelMenuMessage(message, state), true);
-  assert.equal(matchesChannelMenuMessage({ ...message, key: { ...message.key, remoteJid: 'other@newsletter' } }, state), false);
-  assert.equal(matchesChannelMenuMessage({ ...message, message: { conversation: 'not the menu' } }, state), false);
-  assert.equal(matchesChannelMenuMessage(message, { ...state, status: 'ready' }), false);
+test('hashes the exact caption and validates WhatsApp server IDs', () => {
+  assert.equal(captionHash('CASTRO-MD menu'), captionHash('CASTRO-MD menu'));
+  assert.notEqual(captionHash('CASTRO-MD menu'), captionHash('Other menu'));
+  assert.equal(validServerMessageId('123456'), 123456);
+  assert.equal(validServerMessageId('0'), null);
+  assert.equal(validServerMessageId('-1'), null);
+  assert.equal(validServerMessageId('not-an-id'), null);
+  assert.equal(validServerMessageId('2147483648'), null);
 });
 
-test('converts persisted millisecond timestamps to Unix seconds for Baileys', () => {
-  assert.equal(lookupSinceSeconds(1793904561000), 1793903661);
-  assert.equal(lookupSinceSeconds(1793904561), 1793903661);
-  assert.equal(lookupSinceSeconds(0), 0);
-});
-
-test('reconstructs only a real server-addressed newsletter message matching the menu', () => {
-  const caption = 'CASTRO-MD menu';
-  const hash = crypto.createHash('sha256').update(caption).digest('hex');
-  const response = {
-    tag: 'iq',
-    attrs: {},
-    content: [{ tag: 'message_updates', attrs: {}, content: [nodeFor('123456', caption)] }],
+test('builds Channel-attributed forward content using a verified server ID', () => {
+  const posted = {
+    key: { remoteJid: '12345@newsletter', id: '123456', fromMe: true },
+    message: { imageMessage: { caption: 'CASTRO-MD menu' } },
   };
-  const result = findNewsletterMessage(response, proto, '12345@newsletter', hash);
-  assert.equal(result.key.remoteJid, '12345@newsletter');
-  assert.equal(result.key.id, '123456');
-  assert.equal(result.key.fromMe, false);
-  assert.equal(result.message.imageMessage.caption, caption);
-});
-
-test('does not accept a different post or a missing server message ID', () => {
-  const caption = 'CASTRO-MD menu';
-  const hash = crypto.createHash('sha256').update(caption).digest('hex');
-  const different = {
-    tag: 'iq', attrs: {},
-    content: [{ tag: 'message_updates', attrs: {}, content: [nodeFor('123457', 'unrelated post')] }],
-  };
-  const noId = {
-    tag: 'iq', attrs: {},
-    content: [{ tag: 'message_updates', attrs: {}, content: [{
-      tag: 'message', attrs: { t: '1793900000' },
-      content: [{ tag: 'plaintext', attrs: {}, content: Buffer.from(JSON.stringify({ conversation: caption })) }],
-    }] }],
-  };
-  assert.equal(findNewsletterMessage(different, proto, '12345@newsletter', hash), null);
-  assert.equal(findNewsletterMessage(noId, proto, '12345@newsletter', hash), null);
-});
-
-test('adds native Channel attribution using the verified numeric server message ID', () => {
-  const posted = { key: { id: '123456' }, message: { imageMessage: { caption: 'CASTRO-MD menu' } } };
-  const forwarded = buildChannelForwardContent(
+  const content = buildChannelForwardContent(
     posted,
     { jid: '12345@newsletter', name: 'CASTRO-MD Official Channel', serverMessageId: 123456 },
-    () => ({ imageMessage: { caption: 'CASTRO-MD menu', contextInfo: { forwardingScore: 1, isForwarded: true } } })
+    () => ({
+      imageMessage: {
+        caption: 'CASTRO-MD menu',
+        contextInfo: { forwardingScore: 1, isForwarded: true },
+      },
+    })
   );
-  assert.deepEqual(forwarded.imageMessage.contextInfo.forwardedNewsletterMessageInfo, {
+  assert.deepEqual(content.imageMessage.contextInfo.forwardedNewsletterMessageInfo, {
     newsletterJid: '12345@newsletter',
     newsletterName: 'CASTRO-MD Official Channel',
     serverMessageId: 123456,
   });
-  assert.equal(forwarded.imageMessage.contextInfo.isForwarded, true);
+  assert.equal(content.imageMessage.contextInfo.isForwarded, true);
+});
+
+test('refuses invalid Channel IDs rather than fabricating attribution', () => {
+  const posted = { key: { id: '123456' }, message: { conversation: 'menu' } };
+  assert.throws(() => buildChannelForwardContent(
+    posted,
+    { jid: '12345@newsletter', name: 'CASTRO-MD', serverMessageId: -1 },
+    () => ({ conversation: 'menu' })
+  ), /verified WhatsApp Channel message ID/);
 });
