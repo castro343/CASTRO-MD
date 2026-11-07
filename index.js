@@ -465,7 +465,7 @@ async function start() {
       }
       // Credentials are saved directly by Baileys into the configured session directory.
       // No manual SESSION_ID copy is needed for a normal pairing.
-      warm(sock); // look up the forwarding channel now, so the first reply is not slow
+      warm(sock); // look up the forwarding channel now, so the first reply is not slow\n      setTimeout(() => require('./lib/channelAnnouncements').publishDeployment(sock, settings, store, log).catch((e) => log.warn('Channel announcement failed:', e.message)), 12000);
       setTimeout(() => notifyConnected(sock), 3000);
     }
     if (connection === 'close') {

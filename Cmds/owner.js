@@ -6,6 +6,38 @@ const store = require('../lib/store');
 
 module.exports = [
   {
+  {
+    name: 'channelannounce',
+    aliases: ['channelpost'],
+    description: 'Manage CASTRO-MD WhatsApp Channel announcements',
+    ownerOnly: true,
+    run: async ({ sock, args, reply, settings, prefix }) => {
+      const action = String(args[0] || 'status').toLowerCase();
+      if (action === 'status') return reply('📢 CHANNEL ANNOUNCEMENTS\\nAutomatic deploy posts: ' + (settings.channelAnnounceEnabled ? 'ON' : 'OFF') + '\\nUse: ' + prefix + 'channelannounce on|off|test|status; ' + prefix + 'channelannounce post Your message');
+      if (action === 'on' || action === 'off') {
+        const old = settings.channelAnnounceEnabled;
+        settings.channelAnnounceEnabled = action === 'on';
+        try { await store.save(settings); } catch (e) { settings.channelAnnounceEnabled = old; return reply('Could not save Channel settings.'); }
+        return reply(action === 'on' ? '✅ Automatic deployment announcements enabled. The next new deployment will be announced after reconnect, if this account can post to the Channel.' : '🔕 Automatic announcements disabled.');
+      }
+      if (!['test', 'post'].includes(action)) return reply('Use: ' + prefix + 'channelannounce on|off|test|status or ' + prefix + 'channelannounce post Your message');
+      if (action === 'test' && !settings.channelAnnounceEnabled) return reply('Enable announcements first with ' + prefix + 'channelannounce on.');
+      const body = action === 'test' ? '🧪 CASTRO-MD CHANNEL TEST\\n\\nChannel publishing is connected.\\n🤖 CASTRO-MD • Official Updates' : args.slice(1).join(' ').trim();
+      if (!body) return reply('Add text after ' + prefix + 'channelannounce post.');
+      try {
+        const link = settings.channelLink || 'https://whatsapp.com/channel/0029VbE0iWxEawdsY3dBaB18';
+        const code = (link.match(/channel\\/([A-Za-z0-9_-]+)/) || [])[1];
+        if (!code || typeof sock.newsletterMetadata !== 'function') throw new Error('Channel lookup is unavailable.');
+        const meta = await sock.newsletterMetadata('invite', code);
+        if (!meta?.id || !String(meta.id).endsWith('@newsletter')) throw new Error('Invalid Channel metadata.');
+        await sock.sendMessage(meta.id, { text: body + '\\n\\n🔗 Official CASTRO-MD updates' });
+        return reply('✅ Published to the CASTRO-MD Channel.');
+      } catch (e) {
+        console.error('[CHANNEL ANNOUNCEMENTS]', e);
+        return reply('❌ Could not publish. Confirm this linked WhatsApp account is a Channel admin with posting permission. ' + String(e.message || e).slice(0, 130));
+      }
+    },
+  },
     name: 'mode',
     description: 'Set command access to private or public: mode private|public',
     ownerOnly: true,
