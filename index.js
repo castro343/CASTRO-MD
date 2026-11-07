@@ -258,7 +258,7 @@ const server = http.createServer(async (req, res) => {
     // Private GitHub Actions callback: announce only commits whose Render deploy is live.
     if (url.pathname === '/api/channel-announcement' && req.method === 'POST') {
       const expectedSecret = process.env.CASTRO_CHANNEL_WEBHOOK_SECRET || '';
-      const suppliedSecret = String(req.headers.authorization || '').replace(/^Bearer\\s+/i, '');
+      const suppliedSecret = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
       if (!expectedSecret || suppliedSecret.length !== expectedSecret.length ||
           !require('crypto').timingSafeEqual(Buffer.from(suppliedSecret), Buffer.from(expectedSecret))) {
         return json(res, 401, { error: 'Unauthorized.' });
@@ -291,13 +291,13 @@ const server = http.createServer(async (req, res) => {
           const author = String(payload.author || 'CASTRO-MD Team').trim().slice(0, 80);
           const compare = String(payload.compare || '').trim();
           const text =
-            '🚀 *CASTRO-MD UPDATE DEPLOYED*\\n\\n' +
-            'A new update has been successfully deployed and is now live.\\n\\n' +
-            `🧩 Update: ${message}\\n` +
-            `👨‍💻 By: ${author}\\n` +
-            `🔖 Version: ${shortSha}\\n` +
-            (compare.startsWith('https://github.com/castro343/CASTRO-MD/commit/') ? `🔗 Details: ${compare}\\n` : '') +
-            '\\n✅ Deployment status: LIVE\\n' +
+            '🚀 *CASTRO-MD UPDATE DEPLOYED*\n\n' +
+            'A new update has been successfully deployed and is now live.\n\n' +
+            `🧩 Update: ${message}\n` +
+            `👨‍💻 By: ${author}\n` +
+            `🔖 Version: ${shortSha}\n` +
+            (compare.startsWith('https://github.com/castro343/CASTRO-MD/commit/') ? `🔗 Details: ${compare}\n` : '') +
+            '\n✅ Deployment status: LIVE\n' +
             '🤖 Powered by CASTRO-MD';
           const sent = await activeSocket.sendMessage(channel.id, { text });
           await collection.updateOne({ _id: commit }, { $set: {
