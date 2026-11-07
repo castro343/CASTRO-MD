@@ -68,6 +68,25 @@ const json = (res, status, body) => {
   res.end(JSON.stringify(body));
 };
 
+let channelAnnouncementMongo = null;
+let channelAnnouncementCollectionPromise = null;
+async function getChannelAnnouncementCollection() {
+  if (!settings.mongoUri) throw new Error('MongoDB is required for announcement duplicate protection.');
+  if (!channelAnnouncementCollectionPromise) {
+    channelAnnouncementCollectionPromise = (async () => {
+      const { MongoClient } = require('mongodb');
+      channelAnnouncementMongo = new MongoClient(settings.mongoUri, { serverSelectionTimeoutMS: 10000 });
+      await channelAnnouncementMongo.connect();
+      return channelAnnouncementMongo.db(settings.mongoDb).collection('channel_announcements');
+    })().catch((error) => {
+      channelAnnouncementCollectionPromise = null;
+      channelAnnouncementMongo = null;
+      throw error;
+    });
+  }
+  return channelAnnouncementCollectionPromise;
+}
+
 const tenantWorkers = new Map();
 const tenantRestartAttempts = new Map();
 const tenantRestartTimers = new Map();
@@ -233,6 +252,66 @@ const server = http.createServer(async (req, res) => {
       } catch {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         return res.end('Pair page not found');
+      }
+    }
+
+    // Private GitHub Actions callback: announce only commits whose Render deploy is live.
+    if (url.pathname === '/api/channel-announcement' && req.method === 'POST') {
+      const expectedSecret = process.env.CASTRO_CHANNEL_WEBHOOK_SECRET || '';
+      const suppliedSecret = String(req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+      if (!expectedSecret || suppliedSecret.length !== expectedSecret.length ||
+          !require('crypto').timingSafeEqual(Buffer.from(suppliedSecret), Buffer.from(expectedSecret))) {
+        return json(res, 401, { error: 'Unauthorized.' });
+      }
+      try {
+        let raw = '';
+        for await (const chunk of req) {
+          raw += chunk;
+          if (raw.length > 10000) throw new Error('Request body too large.');
+        }
+        const payload = JSON.parse(raw || '{}');
+        const commit = String(payload.commit || '').toLowerCase();
+        if (!/^[a-f0-9]{40}$/.test(commit)) return json(res, 400, { error: 'A full commit SHA is required.' });
+        if (!activeSocket?.user?.id) return json(res, 503, { error: 'Main WhatsApp account is not connected yet.' });
+
+        const collection = await getChannelAnnouncementCollection();
+        try {
+          await collection.insertOne({ _id: commit, status: 'pending', createdAt: new Date() });
+        } catch (error) {
+          if (error?.code === 11000) return json(res, 200, { ok: true, duplicate: true });
+          throw error;
+        }
+
+        try {
+          const inviteCode = '0029VbE0iWxEawdsY3dBaB18';
+          const channel = await activeSocket.newsletterMetadata('invite', inviteCode);
+          if (!channel?.id || !String(channel.id).endsWith('@newsletter')) throw new Error('Official Channel could not be resolved.');
+          const shortSha = commit.slice(0, 7);
+          const message = String(payload.message || 'CASTRO-MD has been updated.').trim().slice(0, 700);
+          const author = String(payload.author || 'CASTRO-MD Team').trim().slice(0, 80);
+          const compare = String(payload.compare || '').trim();
+          const text =
+            '🚀 *CASTRO-MD UPDATE DEPLOYED*\n\n' +
+            'A new update has been successfully deployed and is now live.\n\n' +
+            `🧩 Update: ${message}\n` +
+            `👨‍💻 By: ${author}\n` +
+            `🔖 Version: ${shortSha}\n` +
+            (compare.startsWith('https://github.com/castro343/CASTRO-MD/commit/') ? `🔗 Details: ${compare}\n` : '') +
+            '\n✅ Deployment status: LIVE\n' +
+            '🤖 Powered by CASTRO-MD';
+          const sent = await activeSocket.sendMessage(channel.id, { text });
+          await collection.updateOne({ _id: commit }, { $set: {
+            status: 'posted', postedAt: new Date(), channelId: channel.id,
+            whatsappMessageId: sent?.key?.id || null,
+          } });
+          return json(res, 200, { ok: true, posted: true, commit: shortSha });
+        } catch (error) {
+          await collection.deleteOne({ _id: commit }).catch(() => {});
+          throw error;
+        }
+      } catch (error) {
+        log.error('[CHANNEL DEPLOY ANNOUNCEMENT] Failed:', error.message);
+        return json(res, 503, { error: error.message || 'Announcement could not be published.' });
       }
     }
 

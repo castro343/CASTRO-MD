@@ -1,0 +1,103 @@
+name: CASTRO-MD Channel deployment announcements
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: channel-deployment-announcement-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  announce:
+    if: ${{ github.event.deleted == false }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Wait for this exact Render deployment to become live
+        id: deploy
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: srv-dbl6vhd6e07s7398sve0
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "RENDER_API_KEY secret is missing."
+            exit 1
+          fi
+
+          for attempt in $(seq 1 60); do
+            response=$(curl -fsS --retry 2 --retry-delay 2 \
+              -H "Authorization: Bearer $RENDER_API_KEY" \
+              -H "Accept: application/json" \
+              "https://api.render.com/v1/services/$SERVICE_ID/deploys?limit=20") || response=""
+            status=$(printf '%s' "$response" | jq -r --arg sha "$COMMIT_SHA" '
+              [.[] | (.deploy // .) | select((.commit.id // .commitId // "") == $sha)]
+              | first | .status // empty' 2>/dev/null || true)
+
+            if [ "$status" = "live" ]; then
+              echo "Render deployment for $COMMIT_SHA is live."
+              echo "ready=true" >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+
+            case "$status" in
+              build_failed|update_failed|canceled)
+                echo "Render deployment ended with status: $status. No Channel post will be sent."
+                echo "ready=false" >> "$GITHUB_OUTPUT"
+                exit 0
+                ;;
+            esac
+
+            echo "Waiting for Render deployment ($attempt/60). Current status: ${status:-not found}"
+            sleep 30
+          done
+
+          echo "Timed out waiting for the matching Render deployment. No Channel post will be sent."
+          echo "ready=false" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the live deployment announcement
+        if: steps.deploy.outputs.ready == 'true'
+        env:
+          ANNOUNCEMENT_SECRET: ${{ secrets.CASTRO_CHANNEL_WEBHOOK_SECRET }}
+          COMMIT_SHA: ${{ github.sha }}
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
+          COMMIT_URL: ${{ github.event.head_commit.url }}
+        run: |
+          set -euo pipefail
+          if [ -z "$ANNOUNCEMENT_SECRET" ]; then
+            echo "CASTRO_CHANNEL_WEBHOOK_SECRET secret is missing."
+            exit 1
+          fi
+
+          payload=$(jq -n \
+            --arg commit "$COMMIT_SHA" \
+            --arg message "$COMMIT_MESSAGE" \
+            --arg author "$COMMIT_AUTHOR" \
+            --arg compare "https://github.com/castro343/CASTRO-MD/commit/$COMMIT_SHA" \
+            '{commit:$commit,message:$message,author:$author,compare:$compare}')
+
+          for attempt in $(seq 1 10); do
+            code=$(curl -sS -o /tmp/channel-response.json -w '%{http_code}' \
+              -X POST "https://castro-md-runtime.onrender.com/api/channel-announcement" \
+              -H "Authorization: Bearer $ANNOUNCEMENT_SECRET" \
+              -H "Content-Type: application/json" \
+              --data "$payload" || true)
+
+            if [ "$code" = "200" ]; then
+              cat /tmp/channel-response.json
+              exit 0
+            fi
+
+            echo "Announcement endpoint returned HTTP ${code:-unknown}; retry $attempt/10."
+            cat /tmp/channel-response.json 2>/dev/null || true
+            sleep 15
+          done
+
+          echo "Could not publish the announcement after retries."
+          exit 1
