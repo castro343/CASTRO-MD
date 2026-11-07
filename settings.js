@@ -22,7 +22,7 @@ module.exports = {
   sessionDir: process.env.SESSION_DIR || path.join(__dirname, 'session'),
   port: Number(process.env.PORT) || 3000,
   connectAlert: String(process.env.CONNECT_ALERT || 'true') !== 'false',
-  menuImage: process.env.MENU_IMAGE || '',
+  menuImage: process.env.MENU_IMAGE || '',\n  channelAnnounceEnabled: false,\n  channelLastAnnouncedCommit: '',
   timezone: process.env.TIMEZONE || 'Africa/Nairobi',
   repo: process.env.REPO_URL || 'https://github.com/castro343/CASTRO-MD',
   autoRead: String(process.env.AUTO_READ || 'false') === 'true',
