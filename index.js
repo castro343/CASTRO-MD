@@ -94,13 +94,13 @@ async function getChannelAnnouncementCollection() {
 function getFollowerUpdateSummary(raw) {
   const seen = new Set();
   const lines = String(raw || '')
-    .replace(/\\r/g, '')
-    .split('\\n')
+    .replace(/\r/g, '')
+    .split('\n')
     .map((line) => line.trim())
-    .filter((line) => /^USER-FACING:\\s*.+/i.test(line))
-    .map((line) => line.replace(/^USER-FACING:\\s*/i, '').trim())
+    .filter((line) => /^USER-FACING:\s*.+/i.test(line))
+    .map((line) => line.replace(/^USER-FACING:\s*/i, '').trim())
     .filter((line) => line.length >= 12 && line.length <= 240)
-    .filter((line) => !/\\b(pr|pull request|commit|merge|refactor|chore|workflow|deployment|release note|announcement|internal|duplicate|filtering|readability|housekeeping|logging|tests?)\\b/i.test(line))
+    .filter((line) => !/\b(pr|pull request|commit|merge|refactor|chore|workflow|deployment|release note|announcement|internal|duplicate|filtering|readability|housekeeping|logging|tests?)\b/i.test(line))
     .filter((line) => {
       const key = line.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       if (!key || seen.has(key)) return false;
@@ -108,9 +108,8 @@ function getFollowerUpdateSummary(raw) {
       return true;
     });
   if (!lines.length) return null;
-  return lines.slice(0, 3).join(' • ').replace(/\\s+/g, ' ').trim();
+  return lines.slice(0, 3).join(' • ').replace(/\s+/g, ' ').trim();
 }
-
 function buildFollowerAnnouncement(raw) {
   const pairingUrl = (process.env.PUBLIC_PAIRING_URL || 'https://castro-md-runtime.onrender.com/pair').replace(/\/$/, '');
   const summary = getFollowerUpdateSummary(raw);
