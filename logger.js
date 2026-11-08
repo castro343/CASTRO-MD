@@ -16,7 +16,7 @@ const originalConsole = {
   error: console.error.bind(console),
   debug: console.debug.bind(console),
 };
-const SENSITIVE_TEXT = /((?:rootKey|baseKey|chainKey|privKey|privateKey|ephemeralKeyPair|remoteIdentityKey|identityKey|messageKey|messageKeys|signedIdentityKey|registrationData)\\s*:\\s*)(?:<Buffer[^>]*>|[^,}\\n]{1,500})/gi;
+const SENSITIVE_TEXT = /((?:rootKey|baseKey|chainKey|privKey|privateKey|ephemeralKeyPair|remoteIdentityKey|identityKey|messageKey|messageKeys|signedIdentityKey|registrationData)\s*:\s*)(?:<Buffer[^>]*>|[^,}\n]{1,500})/gi;
 function redactLogText(value) {
   return String(value).replace(SENSITIVE_TEXT, '$1[REDACTED]');
 }
