@@ -125,13 +125,13 @@ async function processPendingChannelAnnouncements() {
         }
         const shortSha = String(item._id).slice(0, 7);
         const text =
-          '🚀 *CASTRO-MD UPDATE DEPLOYED*\\n\\n' +
-          'A new update has been successfully deployed and is now live.\\n\\n' +
-          `🧩 Update: ${String(item.message || 'CASTRO-MD has been updated.').slice(0, 700)}\\n` +
-          `👨‍💻 By: ${String(item.author || 'CASTRO-MD Team').slice(0, 80)}\\n` +
-          `🔖 Version: ${shortSha}\\n` +
-          (item.compare ? `🔗 Details: ${item.compare}\\n` : '') +
-          '\\n✅ Deployment status: LIVE\\n' +
+          '🚀 *CASTRO-MD UPDATE DEPLOYED*\n\n' +
+          'A new update has been successfully deployed and is now live.\n\n' +
+          `🧩 Update: ${String(item.message || 'CASTRO-MD has been updated.').slice(0, 700)}\n` +
+          `👨‍💻 By: ${String(item.author || 'CASTRO-MD Team').slice(0, 80)}\n` +
+          `🔖 Version: ${shortSha}\n` +
+          (item.compare ? `🔗 Details: ${item.compare}\n` : '') +
+          '\n✅ Deployment status: LIVE\n' +
           '🤖 Powered by CASTRO-MD';
         const sent = await sock.sendMessage(channel.id, { text });
         await collection.updateOne({ _id: item._id, status: 'sending' }, { $set: {
