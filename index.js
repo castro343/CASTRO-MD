@@ -87,6 +87,87 @@ async function getChannelAnnouncementCollection() {
   return channelAnnouncementCollectionPromise;
 }
 
+
+// Durable Channel announcement queue. A deployment is recorded before attempting WhatsApp,
+// so reconnects/restarts cannot lose it. The _id (full commit SHA) is the idempotency key.
+let processingChannelAnnouncements = false;
+let channelAnnouncementRetryTimer = null;
+
+async function processPendingChannelAnnouncements() {
+  if (tenantId || processingChannelAnnouncements || shuttingDown) return;
+  const sock = activeSocket;
+  if (!sock?.user?.id || sock.ws?.readyState !== 1) return;
+  processingChannelAnnouncements = true;
+  try {
+    const collection = await getChannelAnnouncementCollection();
+    for (let count = 0; count < 10; count++) {
+      if (activeSocket !== sock || sock.ws?.readyState !== 1 || shuttingDown) break;
+      const now = new Date();
+      const claimResult = await collection.findOneAndUpdate(
+        {
+          status: { $in: ['pending', 'sending'] },
+          $or: [
+            { status: 'pending' },
+            { status: 'sending', leaseUntil: { $lt: now } },
+          ],
+        },
+        { $set: { status: 'sending', leaseUntil: new Date(now.getTime() + 2 * 60 * 1000), updatedAt: now } },
+        { sort: { createdAt: 1 }, returnDocument: 'after' }
+      );
+      const item = claimResult?.value || claimResult;
+      if (!item || !item._id) break;
+
+      try {
+        const inviteCode = '0029VbE0iWxEawdsY3dBaB18';
+        const channel = await sock.newsletterMetadata('invite', inviteCode);
+        if (!channel?.id || !String(channel.id).endsWith('@newsletter')) {
+          throw new Error('Official CASTRO-MD Channel could not be resolved.');
+        }
+        const shortSha = String(item._id).slice(0, 7);
+        const text =
+          '🚀 *CASTRO-MD UPDATE DEPLOYED*\\n\\n' +
+          'A new update has been successfully deployed and is now live.\\n\\n' +
+          `🧩 Update: ${String(item.message || 'CASTRO-MD has been updated.').slice(0, 700)}\\n` +
+          `👨‍💻 By: ${String(item.author || 'CASTRO-MD Team').slice(0, 80)}\\n` +
+          `🔖 Version: ${shortSha}\\n` +
+          (item.compare ? `🔗 Details: ${item.compare}\\n` : '') +
+          '\\n✅ Deployment status: LIVE\\n' +
+          '🤖 Powered by CASTRO-MD';
+        const sent = await sock.sendMessage(channel.id, { text });
+        await collection.updateOne({ _id: item._id, status: 'sending' }, { $set: {
+          status: 'posted',
+          postedAt: new Date(),
+          channelId: channel.id,
+          whatsappMessageId: sent?.key?.id || null,
+        }, $unset: { leaseUntil: '', lastError: '' } });
+        log.info(`[CHANNEL DEPLOY ANNOUNCEMENT] Posted deployment ${shortSha} to ${channel.id}.`);
+      } catch (error) {
+        await collection.updateOne({ _id: item._id, status: 'sending' }, {
+          $set: { status: 'pending', lastError: String(error.message || error).slice(0, 500), retryAt: new Date(Date.now() + 30000), updatedAt: new Date() },
+          $inc: { attempts: 1 },
+          $unset: { leaseUntil: '' },
+        }).catch((dbError) => log.error('[CHANNEL DEPLOY ANNOUNCEMENT] Could not release failed queue item:', dbError.message));
+        log.warn('[CHANNEL DEPLOY ANNOUNCEMENT] Delivery deferred:', error.message);
+        break;
+      }
+    }
+  } catch (error) {
+    log.error('[CHANNEL DEPLOY ANNOUNCEMENT] Queue processing failed:', error.message);
+  } finally {
+    processingChannelAnnouncements = false;
+  }
+}
+
+function scheduleChannelAnnouncementRetry() {
+  if (tenantId || channelAnnouncementRetryTimer) return;
+  channelAnnouncementRetryTimer = setInterval(() => {
+    processPendingChannelAnnouncements().catch((error) =>
+      log.error('[CHANNEL DEPLOY ANNOUNCEMENT] Retry worker failed:', error.message)
+    );
+  }, 30000);
+  channelAnnouncementRetryTimer.unref();
+}
+
 const tenantWorkers = new Map();
 const tenantRestartAttempts = new Map();
 const tenantRestartTimers = new Map();
@@ -272,43 +353,37 @@ const server = http.createServer(async (req, res) => {
         const payload = JSON.parse(raw || '{}');
         const commit = String(payload.commit || '').toLowerCase();
         if (!/^[a-f0-9]{40}$/.test(commit)) return json(res, 400, { error: 'A full commit SHA is required.' });
-        if (!activeSocket?.user?.id) return json(res, 503, { error: 'Main WhatsApp account is not connected yet.' });
-
         const collection = await getChannelAnnouncementCollection();
+        const message = String(payload.message || 'CASTRO-MD has been updated.').trim().slice(0, 700);
+        const author = String(payload.author || 'CASTRO-MD Team').trim().slice(0, 80);
+        const compare = String(payload.compare || '').trim();
         try {
-          await collection.insertOne({ _id: commit, status: 'pending', createdAt: new Date() });
+          await collection.insertOne({
+            _id: commit,
+            status: 'pending',
+            message,
+            author,
+            compare: compare.startsWith('https://github.com/castro343/CASTRO-MD/commit/') ? compare : '',
+            createdAt: new Date(),
+            attempts: 0,
+          });
         } catch (error) {
-          if (error?.code === 11000) return json(res, 200, { ok: true, duplicate: true });
-          throw error;
+          if (error?.code === 11000) {
+            const existing = await collection.findOne({ _id: commit });
+            if (existing?.status === 'posted') return json(res, 200, { ok: true, duplicate: true, posted: true });
+            // A retry for an existing queued item is safe; the worker owns delivery.
+          } else {
+            throw error;
+          }
         }
 
-        try {
-          const inviteCode = '0029VbE0iWxEawdsY3dBaB18';
-          const channel = await activeSocket.newsletterMetadata('invite', inviteCode);
-          if (!channel?.id || !String(channel.id).endsWith('@newsletter')) throw new Error('Official Channel could not be resolved.');
-          const shortSha = commit.slice(0, 7);
-          const message = String(payload.message || 'CASTRO-MD has been updated.').trim().slice(0, 700);
-          const author = String(payload.author || 'CASTRO-MD Team').trim().slice(0, 80);
-          const compare = String(payload.compare || '').trim();
-          const text =
-            '🚀 *CASTRO-MD UPDATE DEPLOYED*\n\n' +
-            'A new update has been successfully deployed and is now live.\n\n' +
-            `🧩 Update: ${message}\n` +
-            `👨‍💻 By: ${author}\n` +
-            `🔖 Version: ${shortSha}\n` +
-            (compare.startsWith('https://github.com/castro343/CASTRO-MD/commit/') ? `🔗 Details: ${compare}\n` : '') +
-            '\n✅ Deployment status: LIVE\n' +
-            '🤖 Powered by CASTRO-MD';
-          const sent = await activeSocket.sendMessage(channel.id, { text });
-          await collection.updateOne({ _id: commit }, { $set: {
-            status: 'posted', postedAt: new Date(), channelId: channel.id,
-            whatsappMessageId: sent?.key?.id || null,
-          } });
-          return json(res, 200, { ok: true, posted: true, commit: shortSha });
-        } catch (error) {
-          await collection.deleteOne({ _id: commit }).catch(() => {});
-          throw error;
+        if (!activeSocket?.user?.id || activeSocket.ws?.readyState !== 1) {
+          return json(res, 202, { ok: true, queued: true, reason: 'WhatsApp account is reconnecting.' });
         }
+        await processPendingChannelAnnouncements();
+        const current = await collection.findOne({ _id: commit });
+        if (current?.status === 'posted') return json(res, 200, { ok: true, posted: true, commit: commit.slice(0, 7) });
+        return json(res, 202, { ok: true, queued: true, commit: commit.slice(0, 7) });
       } catch (error) {
         log.error('[CHANNEL DEPLOY ANNOUNCEMENT] Failed:', error.message);
         return json(res, 503, { error: error.message || 'Announcement could not be published.' });
@@ -545,6 +620,10 @@ async function start() {
       // Credentials are saved directly by Baileys into the configured session directory.
       // No manual SESSION_ID copy is needed for a normal pairing.
       warm(sock); // look up the forwarding channel now, so the first reply is not slow
+      if (!tenantId) {
+        scheduleChannelAnnouncementRetry();
+        setTimeout(() => processPendingChannelAnnouncements(), 1500);
+      }
       setTimeout(() => notifyConnected(sock), 3000);
     }
     if (connection === 'close') {
@@ -719,6 +798,8 @@ async function gracefulShutdown(signal) {
   shuttingDown = true;
   log.info(`Received ${signal}; shutting down CASTRO-MD gracefully...`);
   clearInterval(keepAliveTimer);
+  if (channelAnnouncementRetryTimer) clearInterval(channelAnnouncementRetryTimer);
+  channelAnnouncementRetryTimer = null;
   clearInterval(presenceTimer);
   presenceTimer = null;
   try { await guard.flush?.(); } catch (e) { log.error('Guard save during shutdown failed:', e.message); }
