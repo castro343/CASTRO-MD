@@ -91,17 +91,28 @@ async function getChannelAnnouncementCollection() {
 
 // Turn internal merge/commit metadata into a short, follower-facing release note.
 function getFollowerUpdateSummary(raw) {
+  const seen = new Set();
   const lines = String(raw || '')
     .replace(/\r/g, '')
     .split('\n')
-    .map((line) => line.trim())
+    .map((line) => line.trim().replace(/^[*•-]\s*/, '').replace(/\s+\(#\d+\)\s*$/i, '').trim())
     .filter(Boolean)
     .filter((line) => !/^Merge pull request #\d+\b/i.test(line))
     .filter((line) => !/^Merge branch\b/i.test(line))
     .filter((line) => !/^Co-authored-by:/i.test(line))
-    .filter((line) => !/^https?:\/\//i.test(line));
-  const summary = lines.slice(0, 3).join(' — ').replace(/\s+/g, ' ').trim();
-  if (!summary) return 'We have made improvements to CASTRO-MD to make your experience better.';
+    .filter((line) => !/^https?:\/\//i.test(line))
+    .filter((line) => {
+      // Do not expose internal release/deployment housekeeping as a customer feature.
+      if (/\b(release note|announcement template|deployment announcement|follower-friendly|readability)\b/i.test(line)) return false;
+      const key = line.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  if (!lines.length) {
+    return 'We have improved CASTRO-MD behind the scenes. No new command is required for this update.';
+  }
+  const summary = lines.slice(0, 3).join(' • ').replace(/\s+/g, ' ').trim();
   return summary
     .replace(/^(feat|feature):\s*/i, 'New feature: ')
     .replace(/^(fix|bugfix):\s*/i, 'Improvement: ')
