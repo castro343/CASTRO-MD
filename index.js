@@ -738,11 +738,11 @@ async function start() {
       const original = cached.msg;
       const body = getText(original.message) || '[No recoverable text; this may have been a media message.]';
       const notice =
-        '*CASTRO-MD ANTI-DELETE*\\n\\n' +
-        'A message was deleted for everyone.\\n' +
-        `Chat: ${original.key.remoteJid || 'Unknown chat'}\\n` +
-        `Sender: ${original.key.participant || original.key.remoteJid || 'Unknown sender'}\\n\\n` +
-        `Recovered text: ${body.slice(0, 3500)}\\n\\n` +
+        '*CASTRO-MD ANTI-DELETE*\n\n' +
+        'A message was deleted for everyone.\n' +
+        `Chat: ${original.key.remoteJid || 'Unknown chat'}\n` +
+        `Sender: ${original.key.participant || original.key.remoteJid || 'Unknown sender'}\n\n` +
+        `Recovered text: ${body.slice(0, 3500)}\n\n` +
         '_Only text is reported. Media is not downloaded or forwarded._';
       for (const number of settings.owners || []) {
         sock.sendMessage(`${number}@s.whatsapp.net`, { text: notice }).catch((e) => log.warn(`Anti-delete owner notice failed: ${e.message}`));
