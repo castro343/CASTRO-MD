@@ -89,40 +89,32 @@ async function getChannelAnnouncementCollection() {
 }
 
 
-// Turn internal merge/commit metadata into a short, follower-facing release note.
+// Only explicitly approved user-facing release notes may reach the public Channel.
+// Commit titles, PR titles, maintenance notes and inferred summaries are never announcements.
 function getFollowerUpdateSummary(raw) {
   const seen = new Set();
   const lines = String(raw || '')
-    .replace(/\r/g, '')
-    .split('\n')
-    .map((line) => line.trim().replace(/^[*•-]\s*/, '').replace(/\s+\(#\d+\)\s*$/i, '').trim())
-    .filter(Boolean)
-    .filter((line) => !/^Merge pull request #\d+\b/i.test(line))
-    .filter((line) => !/^Merge branch\b/i.test(line))
-    .filter((line) => !/^Co-authored-by:/i.test(line))
-    .filter((line) => !/^https?:\/\//i.test(line))
+    .replace(/\\r/g, '')
+    .split('\\n')
+    .map((line) => line.trim())
+    .filter((line) => /^USER-FACING:\\s*.+/i.test(line))
+    .map((line) => line.replace(/^USER-FACING:\\s*/i, '').trim())
+    .filter((line) => line.length >= 12 && line.length <= 240)
+    .filter((line) => !/\\b(pr|pull request|commit|merge|refactor|chore|workflow|deployment|release note|announcement|internal|duplicate|filtering|readability|housekeeping|logging|tests?)\\b/i.test(line))
     .filter((line) => {
-      // Do not expose internal release/deployment housekeeping as a customer feature.
-      if (/\b(release note|announcement template|deployment announcement|follower-friendly|readability)\b/i.test(line)) return false;
-      const key = line.toLowerCase().replace(/[^a-z0-9.]+/g, ' ').trim();
+      const key = line.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
       if (!key || seen.has(key)) return false;
       seen.add(key);
       return true;
     });
-  if (!lines.length) {
-    return 'We have improved CASTRO-MD behind the scenes. No new command is required for this update.';
-  }
-  const summary = lines.slice(0, 3).join(' • ').replace(/\s+/g, ' ').trim();
-  return summary
-    .replace(/^(feat|feature):\s*/i, 'New feature: ')
-    .replace(/^(fix|bugfix):\s*/i, 'Improvement: ')
-    .replace(/^(chore|refactor|perf):\s*/i, 'Behind-the-scenes improvement: ')
-    .slice(0, 360);
+  if (!lines.length) return null;
+  return lines.slice(0, 3).join(' • ').replace(/\\s+/g, ' ').trim();
 }
 
 function buildFollowerAnnouncement(raw) {
   const pairingUrl = (process.env.PUBLIC_PAIRING_URL || 'https://castro-md-runtime.onrender.com/pair').replace(/\/$/, '');
   const summary = getFollowerUpdateSummary(raw);
+  if (!summary) return null;
   return [
     '🚀 *CASTRO-MD UPDATE*',
     '',
@@ -177,12 +169,20 @@ async function processPendingChannelAnnouncements() {
 
       log.info(`[CHANNEL DEPLOY ANNOUNCEMENT] Processing queued deployment ${String(item._id).slice(0, 7)} (attempt ${Number(item.attempts || 0) + 1}).`);
       try {
+        const text = buildFollowerAnnouncement(item.message);
+        if (!text) {
+          await collection.updateOne({ _id: item._id, status: 'sending' }, {
+            $set: { status: 'skipped', skippedAt: new Date(), skipReason: 'No explicit user-facing release note was supplied.' },
+            $unset: { leaseUntil: '' },
+          });
+          log.info(`[CHANNEL DEPLOY ANNOUNCEMENT] Skipped deployment ${String(item._id).slice(0, 7)}: no approved user-facing release note.`);
+          continue;
+        }
         const inviteCode = '0029VbE0iWxEawdsY3dBaB18';
         const channel = await sock.newsletterMetadata('invite', inviteCode);
         if (!channel?.id || !String(channel.id).endsWith('@newsletter')) {
           throw new Error('Official CASTRO-MD Channel could not be resolved.');
         }
-        const text = buildFollowerAnnouncement(item.message);
         const sent = await sock.sendMessage(channel.id, { text });
         await collection.updateOne({ _id: item._id, status: 'sending' }, { $set: {
           status: 'posted',
@@ -190,7 +190,7 @@ async function processPendingChannelAnnouncements() {
           channelId: channel.id,
           whatsappMessageId: sent?.key?.id || null,
         }, $unset: { leaseUntil: '', lastError: '' } });
-        log.info(`[CHANNEL DEPLOY ANNOUNCEMENT] Posted deployment ${shortSha} to ${channel.id}.`);
+        log.info(`[CHANNEL DEPLOY ANNOUNCEMENT] Posted deployment ${String(item._id).slice(0, 7)} to ${channel.id}.`);
       } catch (error) {
         await collection.updateOne({ _id: item._id, status: 'sending' }, {
           $set: { status: 'pending', lastError: String(error.message || error).slice(0, 500), retryAt: new Date(Date.now() + 30000), updatedAt: new Date() },
