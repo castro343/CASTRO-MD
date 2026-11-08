@@ -89,7 +89,7 @@ jobs:
               -H "Content-Type: application/json" \
               --data "$payload" || true)
 
-            if [ "$code" = "200" ]; then
+            if [ "$code" = "200" ] || [ "$code" = "202" ]; then
               cat /tmp/channel-response.json
               exit 0
             fi
