@@ -100,7 +100,7 @@ function getFollowerUpdateSummary(raw) {
     .filter((line) => !/^Merge branch\b/i.test(line))
     .filter((line) => !/^Co-authored-by:/i.test(line))
     .filter((line) => !/^https?:\/\//i.test(line));
-  const summary = lines.slice(0, 3).join('\n').replace(/\s+/g, ' ').trim();
+  const summary = lines.slice(0, 3).join(' — ').replace(/\s+/g, ' ').trim();
   if (!summary) return 'We have made improvements to CASTRO-MD to make your experience better.';
   return summary
     .replace(/^(feat|feature):\s*/i, 'New feature: ')
