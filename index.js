@@ -89,6 +89,52 @@ async function getChannelAnnouncementCollection() {
 }
 
 
+// Turn internal merge/commit metadata into a short, follower-facing release note.
+function getFollowerUpdateSummary(raw) {
+  const lines = String(raw || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => !/^Merge pull request #\d+\b/i.test(line))
+    .filter((line) => !/^Merge branch\b/i.test(line))
+    .filter((line) => !/^Co-authored-by:/i.test(line))
+    .filter((line) => !/^https?:\/\//i.test(line));
+  const summary = lines.slice(0, 3).join('\n').replace(/\s+/g, ' ').trim();
+  if (!summary) return 'We have made improvements to CASTRO-MD to make your experience better.';
+  return summary
+    .replace(/^(feat|feature):\s*/i, 'New feature: ')
+    .replace(/^(fix|bugfix):\s*/i, 'Improvement: ')
+    .replace(/^(chore|refactor|perf):\s*/i, 'Behind-the-scenes improvement: ')
+    .slice(0, 360);
+}
+
+function buildFollowerAnnouncement(raw) {
+  const pairingUrl = (process.env.PUBLIC_PAIRING_URL || 'https://castro-md-runtime.onrender.com/pair').replace(/\/$/, '');
+  const summary = getFollowerUpdateSummary(raw);
+  return [
+    '🚀 *CASTRO-MD UPDATE*',
+    '',
+    'We have just rolled out an update! Here is what is new:',
+    '',
+    '✨ *What changed*',
+    summary,
+    '',
+    '📲 *Get started / pair CASTRO-MD*',
+    '1. Open the pairing page below.',
+    '2. Enter your WhatsApp number with country code and generate a pairing code.',
+    '3. In WhatsApp, go to Linked devices → Link a device → Link with phone number.',
+    '4. Enter the code shown on the page.',
+    '',
+    '💡 Already paired? Send *.menu* to see the available commands and try the latest update.',
+    '',
+    '🔗 *CASTRO-MD Pairing Page*',
+    pairingUrl,
+    '',
+    '*POWERED BY CASTRO*',
+  ].join('\n');
+}
+
 // Durable Channel announcement queue. A deployment is recorded before attempting WhatsApp,
 // so reconnects/restarts cannot lose it. The _id (full commit SHA) is the idempotency key.
 let processingChannelAnnouncements = false;
@@ -125,16 +171,7 @@ async function processPendingChannelAnnouncements() {
         if (!channel?.id || !String(channel.id).endsWith('@newsletter')) {
           throw new Error('Official CASTRO-MD Channel could not be resolved.');
         }
-        const shortSha = String(item._id).slice(0, 7);
-        const text =
-          '🚀 *CASTRO-MD UPDATE DEPLOYED*\n\n' +
-          'A new update has been successfully deployed and is now live.\n\n' +
-          `🧩 Update: ${String(item.message || 'CASTRO-MD has been updated.').slice(0, 700)}\n` +
-          `👨‍💻 By: ${String(item.author || 'CASTRO-MD Team').slice(0, 80)}\n` +
-          `🔖 Version: ${shortSha}\n` +
-          (item.compare ? `🔗 Details: ${item.compare}\n` : '') +
-          '\n✅ Deployment status: LIVE\n' +
-          '🤖 Powered by CASTRO-MD';
+        const text = buildFollowerAnnouncement(item.message);
         const sent = await sock.sendMessage(channel.id, { text });
         await collection.updateOne({ _id: item._id, status: 'sending' }, { $set: {
           status: 'posted',
