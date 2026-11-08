@@ -37,6 +37,7 @@ let restoredFromEnv = false;
 const sentCache = new Map();
 let mongoLogged = false;
 let activeSocket = null;
+let activeSocketReady = false;
 let activeCredentialsRegistered = false;
 let presenceTimer = null;
 let shuttingDown = false;
@@ -96,12 +97,12 @@ let channelAnnouncementRetryTimer = null;
 async function processPendingChannelAnnouncements() {
   if (tenantId || processingChannelAnnouncements || shuttingDown) return;
   const sock = activeSocket;
-  if (!sock?.user?.id || sock.ws?.readyState !== 1) return;
+  if (!sock?.user?.id || !activeSocketReady || activeSocket !== sock) return;
   processingChannelAnnouncements = true;
   try {
     const collection = await getChannelAnnouncementCollection();
     for (let count = 0; count < 10; count++) {
-      if (activeSocket !== sock || sock.ws?.readyState !== 1 || shuttingDown) break;
+      if (activeSocket !== sock || !activeSocketReady || shuttingDown) break;
       const now = new Date();
       const claimResult = await collection.findOneAndUpdate(
         {
@@ -117,6 +118,7 @@ async function processPendingChannelAnnouncements() {
       const item = claimResult?.value || claimResult;
       if (!item || !item._id) break;
 
+      log.info(`[CHANNEL DEPLOY ANNOUNCEMENT] Processing queued deployment ${String(item._id).slice(0, 7)} (attempt ${Number(item.attempts || 0) + 1}).`);
       try {
         const inviteCode = '0029VbE0iWxEawdsY3dBaB18';
         const channel = await sock.newsletterMetadata('invite', inviteCode);
@@ -377,7 +379,7 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        if (!activeSocket?.user?.id || activeSocket.ws?.readyState !== 1) {
+        if (!activeSocket?.user?.id || !activeSocketReady) {
           return json(res, 202, { ok: true, queued: true, reason: 'WhatsApp account is reconnecting.' });
         }
         await processPendingChannelAnnouncements();
@@ -553,6 +555,7 @@ async function start() {
   });
 
   activeSocket = sock;
+  activeSocketReady = false;
 
   const origSend = sock.sendMessage.bind(sock);
   sock.sendMessage = async (...args) => {
@@ -607,6 +610,7 @@ async function start() {
       qrcode.generate(qr, { small: true });
     }
     if (connection === 'open') {
+      if (activeSocket === sock) activeSocketReady = true;
       activeCredentialsRegistered = true;
       log.info(`${settings.botName} connected as ${sock.user?.id}`);
       if (tenantId && process.send) process.send({ type: 'connected', tenantId, jid: sock.user?.id || null });
@@ -627,6 +631,7 @@ async function start() {
       setTimeout(() => notifyConnected(sock), 3000);
     }
     if (connection === 'close') {
+      if (activeSocket === sock) activeSocketReady = false;
       if (shuttingDown) return;
       const code = lastDisconnect?.error?.output?.statusCode;
       if (code === DisconnectReason.loggedOut) {
