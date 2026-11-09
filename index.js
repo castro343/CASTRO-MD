@@ -574,6 +574,9 @@ async function start() {
   if (!authStore) authStore = await useMultiFileAuthState(settings.sessionDir);
   const { state, saveCreds } = authStore;
   activeCredentialsRegistered = !!state.creds.registered;
+  if (tenantId) {
+    log.info(`[TENANT PAIRING] Auth initialized (registered=${activeCredentialsRegistered}, pairingNumberPresent=${!!settings.pairingNumber}).`);
+  }
   // Never wait long for the version lookup: if it is slow, start with the version built into Baileys.
   const { version } = await Promise.race([
     fetchLatestBaileysVersion(),
@@ -618,6 +621,7 @@ async function start() {
   if (settings.pairingNumber && !sock.authState.creds.registered) {
     setTimeout(async () => {
       try {
+        if (tenantId) log.info('[TENANT PAIRING] Requesting a WhatsApp pairing code.');
         const code = await sock.requestPairingCode(settings.pairingNumber);
         const formattedCode = code?.match(/.{1,4}/g)?.join('-') || code;
         log.info(`Pairing code: ${formattedCode}`);
@@ -680,7 +684,12 @@ async function start() {
     if (connection === 'close') {
       if (activeSocket === sock) activeSocketReady = false;
       if (shuttingDown) return;
-      const code = lastDisconnect?.error?.output?.statusCode;
+      const disconnectError = lastDisconnect?.error;
+      const code = disconnectError?.output?.statusCode;
+      if (tenantId) {
+        const errorType = disconnectError?.name || disconnectError?.constructor?.name || 'unknown';
+        log.warn(`[TENANT PAIRING] Socket closed (statusCode=${Number.isFinite(Number(code)) ? Number(code) : 'unknown'}, errorType=${String(errorType).replace(/[^a-zA-Z0-9_.-]/g, '').slice(0, 40)}).`);
+      }
       if (code === DisconnectReason.loggedOut) {
         log.error('Logged out. A fresh pairing is required for this account.');
         if (authStore.clear) await authStore.clear().catch(() => {});
