@@ -177,7 +177,23 @@ module.exports = [
     },
   },
   {
-    
+    {
+    name: 'statusreact',
+    aliases: ['sr'],
+    category: 'owner',
+    ownerOnly: true,
+    description: 'Turn auto status reactions on or off',
+    run: async ({ reply, args, prefix, settings }) => {
+      const opt = (args[0] || '').toLowerCase();
+      if (opt === 'on') settings.statusReact = true;
+      else if (opt === 'off') settings.statusReact = false;
+      else {
+        return reply(`Usage: ${prefix}statusreact on/off\nCurrent: ${settings.statusReact ? 'ON' : 'OFF'}`);
+      }
+      return reply(`Status react is now *${settings.statusReact ? 'ON' : 'OFF'}*`);
+    },
+  },
+  {
     name: 'ping',
     aliases: ['speed'],
     description: 'Check response speed',
