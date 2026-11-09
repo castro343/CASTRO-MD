@@ -98,10 +98,25 @@
       if(number.length<8||number.length>15){error.textContent='Enter a valid number with country code.';return;}
       button.disabled=true;button.textContent='REQUESTING CODE…';
       try{
-        const response=await fetch('/api/pair?number='+encodeURIComponent(number));
-        const data=await response.json();
+        const response=await fetch('/api/pair?number='+encodeURIComponent(number),{
+          headers:{'Accept':'application/json'},
+          cache:'no-store'
+        });
+        const body=await response.text();
+        let data;
+        try{data=JSON.parse(body);}
+        catch(_){
+          const status=response.status;
+          if(status===502||status===503||status===504){
+            throw new Error('The pairing service is temporarily unavailable. Wait a minute and try again.');
+          }
+          throw new Error('The server returned an unexpected response. Please try again shortly.');
+        }
         if(!response.ok)throw new Error(data.error||'Pairing request failed.');
-        codeElement.textContent=data.code;
+        if(!data||typeof data.code!=='string'||!data.code.trim()){
+          throw new Error('The pairing service did not return a code. Please try again.');
+        }
+        codeElement.textContent=data.code.trim();
         copyButton.textContent='COPY PAIRING CODE';copyButton.classList.remove('copied');
         copyHint.textContent='';
         result.style.display='block';
