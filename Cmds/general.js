@@ -186,11 +186,12 @@ module.exports = [
       if (!['on', 'off'].includes(choice)) {
         return reply('Usage: ' + prefix + 'statusreact on/off\\nCurrent setting: ' + (settings.statusReact ? 'ON' : 'OFF'));
       }
+      const previous = settings.statusReact;
       settings.statusReact = choice === 'on';
       try {
         await store.save(settings);
       } catch (error) {
-        settings.statusReact = !settings.statusReact;
+        settings.statusReact = previous;
         return reply('Could not save the status reaction setting. Please try again.');
       }
       return reply('Automatic status reactions: ' + (settings.statusReact ? 'ON' : 'OFF') + '\\nReactions: 💔 🥹 👍');
