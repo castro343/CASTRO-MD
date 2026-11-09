@@ -176,7 +176,6 @@ module.exports = [
       }
     },
   },
-  {
     {
     name: 'statusreact',
     aliases: ['sr'],
