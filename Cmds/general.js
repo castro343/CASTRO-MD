@@ -184,7 +184,7 @@ module.exports = [
     run: async ({ reply, text, settings, prefix }) => {
       const choice = String(text || '').trim().toLowerCase();
       if (!['on', 'off'].includes(choice)) {
-        return reply('Usage: ' + prefix + 'statusreact on/off\\nCurrent setting: ' + (settings.statusReact ? 'ON' : 'OFF'));
+        return reply('Usage: ' + prefix + 'statusreact on/off\nCurrent setting: ' + (settings.statusReact ? 'ON' : 'OFF'));
       }
       const previous = settings.statusReact;
       settings.statusReact = choice === 'on';
@@ -194,7 +194,7 @@ module.exports = [
         settings.statusReact = previous;
         return reply('Could not save the status reaction setting. Please try again.');
       }
-      return reply('Automatic status reactions: ' + (settings.statusReact ? 'ON' : 'OFF') + '\\nReactions: 💔 🥹 👍');
+      return reply('Automatic status reactions: ' + (settings.statusReact ? 'ON' : 'OFF') + '\nReactions: 💔 🥹 👍');
     },
   },
   {
