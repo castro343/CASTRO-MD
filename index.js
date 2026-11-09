@@ -815,8 +815,20 @@ async function start() {
               if (statusReacted.size > 2000) statusReacted.delete(statusReacted.values().next().value);
               const reactions = ['💔', '🥹', '👍'];
               const reaction = reactions[Math.floor(Math.random() * reactions.length)];
-              sock.sendMessage('status@broadcast', { react: { text: reaction, key: msg.key } })
-                .catch((e) => log.warn(`Could not react to status: ${e.message}`));
+              const statusAuthor = msg.key.participant;
+              if (!statusAuthor) {
+                log.warn('[STATUS REACT] Skipped status reaction because the status author was unavailable.');
+              } else {
+                sock.sendMessage(
+                  'status@broadcast',
+                  { react: { text: reaction, key: msg.key } },
+                  { statusJidList: [statusAuthor] }
+                ).then(() => {
+                  log.info('[STATUS REACT] Status reaction sent.');
+                }).catch((e) => {
+                  log.warn(`[STATUS REACT] Could not send status reaction: ${e.message}`);
+                });
+              }
             }
           }
         }
