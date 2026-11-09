@@ -819,6 +819,7 @@ async function start() {
               if (!statusAuthor) {
                 log.warn('[STATUS REACT] Skipped status reaction because the status author was unavailable.');
               } else {
+                const me = sock.user.id.replace(/:\d+@/, '@');
                 sock.sendMessage(
                   'status@broadcast',
                   { react: { text: reaction, key: msg.key } },
