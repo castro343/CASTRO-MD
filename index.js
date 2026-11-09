@@ -40,6 +40,7 @@ let activeSocket = null;
 let activeSocketReady = false;
 let activeCredentialsRegistered = false;
 let presenceTimer = null;
+const statusReacted = new Set();
 let shuttingDown = false;
 const tenantId = process.env.TENANT_ID || '';
 
@@ -802,10 +803,22 @@ async function start() {
         }
         continue;
       }
-      // Status updates are never commands: just mark them as seen when auto view is on.
+      // Status updates are never commands. Viewing and reacting are separate opt-in settings.
       if (msg.key.remoteJid === 'status@broadcast') {
-        if (settings.autoViewStatus && type === 'notify' && !msg.key.fromMe && msg.message) {
-          sock.readMessages([msg.key]).catch((e) => log.warn(`Could not view status: ${e.message}`));
+        if (type === 'notify' && !msg.key.fromMe && msg.message) {
+          if (settings.autoViewStatus) {
+            sock.readMessages([msg.key]).catch((e) => log.warn(`Could not view status: ${e.message}`));
+          }
+          if (settings.statusReact && msg.key.id) {
+            if (!statusReacted.has(msg.key.id)) {
+              statusReacted.add(msg.key.id);
+              if (statusReacted.size > 2000) statusReacted.delete(statusReacted.values().next().value);
+              const reactions = ['💔', '🥹', '👍'];
+              const reaction = reactions[Math.floor(Math.random() * reactions.length)];
+              sock.sendMessage('status@broadcast', { react: { text: reaction, key: msg.key } })
+                .catch((e) => log.warn(`Could not react to status: ${e.message}`));
+            }
+          }
         }
         continue;
       }

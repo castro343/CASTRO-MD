@@ -63,6 +63,7 @@ async function getPicture(sock, settings) {
 const CATEGORY_ORDER = ['general', 'ai', 'download', 'fun', 'group', 'github', 'owner'];
 const CATEGORY_ICON = { general: '🏠', ai: '🤖', download: '📥', fun: '🎉', group: '👥', github: '🐙', owner: '👑' };
 const { FOOTER } = require('../lib/brand');
+const store = require('../lib/store');
 const TIMEZONE = 'Africa/Nairobi';
 
 // One list with every command, grouped by category.
@@ -106,6 +107,8 @@ module.exports = [
     aliases: ['help', 'commands', 'fullmenu', 'allmenu', 'list'],
     description: 'Show every command in one list, with the bot picture',
     run: async ({ sock, msg, from, sender, reply, commands, prefix, settings, channelLink, args }) => {
+      // React to the user's menu request before sending the menu.
+      sock.sendMessage(from, { react: { text: '👑', key: msg.key } }).catch(() => {});
       // ".menu <command>": what one command does.
       const want = (args[0] || '').toLowerCase().replace(prefix, '');
       if (want && want !== 'all') {
@@ -171,6 +174,27 @@ module.exports = [
         await reply(full); // picture failed: still send the full menu as text
         await sendMenuVoice(sock, from);
       }
+    },
+  },
+  {
+    name: 'statusreact',
+    aliases: ['statusreaction'],
+    description: 'Enable or disable automatic status reactions',
+    ownerOnly: true,
+    run: async ({ reply, text, settings, prefix }) => {
+      const choice = String(text || '').trim().toLowerCase();
+      if (!['on', 'off'].includes(choice)) {
+        return reply('Usage: ' + prefix + 'statusreact on/off\nCurrent setting: ' + (settings.statusReact ? 'ON' : 'OFF'));
+      }
+      const previous = settings.statusReact;
+      settings.statusReact = choice === 'on';
+      try {
+        await store.save(settings);
+      } catch (error) {
+        settings.statusReact = previous;
+        return reply('Could not save the status reaction setting. Please try again.');
+      }
+      return reply('Automatic status reactions: ' + (settings.statusReact ? 'ON' : 'OFF') + '\nReactions: 💔 🥹 👍');
     },
   },
   {
