@@ -823,7 +823,7 @@ async function start() {
                 sock.sendMessage(
                   'status@broadcast',
                   { react: { text: reaction, key: msg.key } },
-                  { statusJidList: [statusAuthor] }
+                  { statusJidList: [statusAuthor, me] }
                 ).then(() => {
                   log.info('[STATUS REACT] Status reaction sent.');
                 }).catch((e) => {
