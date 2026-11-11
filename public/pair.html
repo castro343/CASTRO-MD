@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#080b12">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#070b11">
   <meta name="description" content="Securely connect your WhatsApp account to CASTRO-MD.">
   <meta name="application-name" content="CASTRO-MD">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -12,94 +12,84 @@
   <link rel="manifest" href="/manifest.webmanifest">
   <link rel="icon" href="/castro-md-icon.png" type="image/png">
   <link rel="apple-touch-icon" href="/castro-md-icon.png">
-  <title>CASTRO-MD | Connect WhatsApp</title>
+  <title>CASTRO-MD | Connection Centre</title>
   <style>
-    :root{color-scheme:dark;--bg:#070b12;--panel:#101927;--line:#25364b;--gold:#e3b64f;--blue:#35b8ff;--cyan:#72e1ff;--muted:#9aaabd;--green:#37d99a;--red:#ff7777}
+    :root{color-scheme:dark;--bg:#070b11;--panel:#111a26;--line:#344455;--gold:#e7bd69;--blue:#43bdf5;--cyan:#78edff;--muted:#98a8b9;--green:#4ce0a2;--red:#ff7777}
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;padding:26px 16px 40px;background:radial-gradient(ellipse at 12% 4%,#12304c 0,transparent 36%),radial-gradient(ellipse at 90% 90%,#302515 0,transparent 30%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:#f5f8fc}
-    .shell{width:min(100%,1040px);margin:auto}
-    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 34px}
-    .brand{display:flex;align-items:center;gap:13px}.mark{width:48px;height:48px;border-radius:15px;object-fit:cover;border:1px solid #5a7aa0;box-shadow:0 0 25px #2aaeff30}
-    .brand strong{display:block;letter-spacing:.13em;font-size:15px}.brand small{display:block;color:var(--muted);margin-top:4px;font-size:11px;letter-spacing:.08em}
-    .secure{font-size:11px;color:#b8c9dc;border:1px solid var(--line);border-radius:30px;padding:9px 12px;background:#0c1420}
-    .hero{text-align:center;max-width:680px;margin:0 auto 28px}.eyebrow{color:var(--cyan);font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase}
-    h1{font-size:clamp(30px,6vw,48px);letter-spacing:-.045em;line-height:1.08;margin:12px 0}.hero p{color:var(--muted);line-height:1.7;margin:0 auto;max-width:580px;font-size:14px}
-    .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(270px,.85fr);gap:18px;align-items:start}
-    .card{border:1px solid var(--line);border-radius:23px;background:linear-gradient(145deg,#121d2cF5,#0b111cf5);box-shadow:0 22px 70px #0006;padding:25px}
-    .card h2{font-size:17px;margin:0 0 7px}.muted{color:var(--muted);font-size:12px;line-height:1.65}
-    label{display:block;font-size:12px;font-weight:750;margin:23px 0 9px;color:#dce8f5}
-    input{width:100%;padding:15px 16px;border:1px solid #344961;border-radius:13px;background:#080f19;color:#fff;font-size:16px;outline:none}
-    input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #35b8ff20}
-    .primary,.secondary{width:100%;border:0;border-radius:13px;padding:15px;font-size:13px;font-weight:900;letter-spacing:.04em;cursor:pointer;margin-top:13px}
-    .primary{background:linear-gradient(100deg,var(--gold),#f4d98e);color:#1b1508}.primary:disabled{opacity:.55;cursor:wait}
-    .secondary{background:linear-gradient(100deg,#147fc0,#51c9ff);color:#031522}
-    .error{color:var(--red);font-size:12px;line-height:1.5;margin-top:12px;min-height:18px}
-    .result{display:none;margin-top:20px;padding:18px;border:1px solid #245d83;border-radius:16px;background:linear-gradient(145deg,#0b2234,#0b1724)}
-    .result-label{text-align:center;color:#b7d8ed;font-size:11px}.code{font-size:clamp(25px,6vw,34px);font-weight:950;letter-spacing:.16em;color:#7bd4ff;text-align:center;margin:10px 0;overflow-wrap:anywhere}
-    .steps{display:grid;gap:12px;margin-top:19px}.step{display:flex;gap:11px;align-items:flex-start;color:#c6d3e2;font-size:12px;line-height:1.55}.num{flex:0 0 24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#183a54;color:var(--cyan);font-size:11px;font-weight:900}
-    .statusbox{display:none;margin-top:16px;border:1px solid var(--line);border-radius:13px;padding:13px;background:#0a121d}.statusline{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:750}.dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px currentColor}.dot.live{background:var(--green)}.statusdetail{color:var(--muted);font-size:11px;margin:7px 0 0 17px;line-height:1.5}
-    .side{display:grid;gap:15px}.feature{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid #233246}.feature:last-child{border:0;padding-bottom:0}.icon{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#142c40;color:var(--cyan);font-size:16px;flex:0 0 34px}.feature b{display:block;font-size:12px;margin-bottom:4px}.feature span{display:block;color:var(--muted);font-size:11px;line-height:1.5}
-    .notice{border:1px solid #5a4828;background:#201a10;border-radius:15px;padding:15px;color:#e9d6ad;font-size:11px;line-height:1.65}.notice b{color:#ffe2a0}
-    .foot{text-align:center;color:#74849a;font-size:10px;letter-spacing:.12em;margin:28px 0 0}
-    @media(max-width:760px){.layout{grid-template-columns:1fr}.card{padding:21px}header{margin-bottom:27px}.secure{font-size:10px}}
+    body{margin:0;min-height:100vh;padding:22px 16px 30px;background:radial-gradient(ellipse at 0 22%,#123c493b,transparent 38%),radial-gradient(ellipse at 100% 70%,#63334a24,transparent 38%),linear-gradient(145deg,#070b11,#0a111a 55%,#080b12);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:#f4f7fb;overflow-x:hidden}
+    body:before{content:"";position:fixed;inset:0;pointer-events:none;opacity:.16;background-image:linear-gradient(90deg,transparent 49%,#4cb9d41c 50%,transparent 51%),linear-gradient(0deg,transparent 49%,#4cb9d41c 50%,transparent 51%);background-size:42px 42px;mask-image:linear-gradient(to bottom,black,transparent 80%)}
+    .shell{width:min(100%,720px);margin:auto;position:relative}
+    header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:0 0 28px}
+    .brand{display:flex;align-items:center;gap:12px;min-width:0}.mark{width:54px;height:54px;border-radius:16px;object-fit:cover;border:1px solid #7b9aad88;box-shadow:0 0 22px #53d9f044}
+    .brand strong{display:block;letter-spacing:.11em;font-size:clamp(14px,3vw,19px)}.brand small{display:block;color:var(--muted);margin-top:4px;font-size:11px;letter-spacing:.08em}
+    .secure{font-size:11px;letter-spacing:.06em;color:#d1deeb;border:1px solid #415064;border-radius:12px;padding:10px 12px;background:#111a26b8;white-space:nowrap}
+    .hero{text-align:center;margin:0 auto 24px}.eyebrow{color:#b9c9d9;font-size:12px;letter-spacing:.2em;text-transform:uppercase;font-family:ui-monospace,monospace}
+    h1{font-size:clamp(29px,7vw,47px);letter-spacing:-.045em;line-height:1.06;margin:13px 0 0;text-shadow:0 0 25px #52dfff2b}.hero h1 span{color:#dffaff}
+    .connect-card{border:1px solid #8da5b35c;border-radius:25px;padding:23px;background:linear-gradient(145deg,#172330eF,#0c141eeF);box-shadow:0 18px 65px #0009,0 0 28px #49dfff12;backdrop-filter:blur(14px)}
+    .card-title{font-family:ui-monospace,monospace;font-size:clamp(19px,4vw,25px);margin:0 0 24px;font-weight:500}
+    label{display:block;font-size:12px;color:#b7c3d0;letter-spacing:.08em;margin:0 0 9px}
+    .input-wrap{display:flex;align-items:center;gap:10px;border:1px solid #4c6074;border-radius:15px;background:#080f19;padding:0 14px;box-shadow:inset 0 0 18px #0008}
+    .flag{font-size:24px}.input-wrap input{min-width:0;width:100%;padding:16px 0;border:0;background:transparent;color:white;font-size:18px;outline:0}
+    .input-wrap:focus-within{border-color:var(--cyan);box-shadow:0 0 0 3px #43bdf522}
+    .primary{width:100%;margin-top:18px;padding:16px 14px;border:1px solid #e8c77c;border-radius:15px;background:linear-gradient(100deg,#090c10,#211b12 52%,#0b1017);color:#f7dfad;font-size:14px;font-weight:850;letter-spacing:.06em;cursor:pointer;box-shadow:0 0 20px #d8a83d30,inset 0 0 18px #d8a83d12}
+    .primary:disabled{opacity:.55;cursor:wait}
+    .error{color:var(--red);font-size:12px;line-height:1.5;margin-top:10px;min-height:18px}
+    .result{display:none;margin-top:20px;border:1px solid #52677b;border-radius:20px;overflow:hidden;background:linear-gradient(145deg,#101c2a,#0a111b);box-shadow:0 12px 35px #0007}
+    .result-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:#ffffff0a;color:#c5d1dc;font:12px ui-monospace,monospace;letter-spacing:.08em}
+    .code-row{display:flex;align-items:center;gap:10px;padding:14px 15px 17px}.code{flex:1;min-width:0;font:900 clamp(25px,7vw,37px)/1.2 ui-monospace,monospace;letter-spacing:.08em;color:#f3f7fb;overflow-wrap:anywhere}
+    .copy{border:1px solid #546779;background:#152333;color:#d9e8f6;border-radius:11px;padding:10px 12px;font-size:12px;cursor:pointer}
+    .timer-area{display:grid;grid-template-columns:108px 1fr;gap:15px;align-items:center;padding:15px;border-top:1px solid #344456;background:#0b131e}
+    .timer{width:100px;height:100px;border-radius:50%;display:grid;place-content:center;text-align:center;border:5px solid #304253;border-top-color:var(--cyan);border-right-color:#50c7f5;box-shadow:0 0 17px #51dfff21}
+    .timer strong{font:24px ui-monospace,monospace}.timer small{font-size:10px;color:var(--muted);letter-spacing:.1em}
+    .timer-copy b{display:block;font:12px ui-monospace,monospace;color:#b6c7d8;letter-spacing:.08em;margin-bottom:7px}.timer-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
+    .steps{display:grid;gap:11px;padding:17px 16px}.step{display:flex;gap:11px;align-items:flex-start;color:#c6d3e2;font-size:12px;line-height:1.55}.num{flex:0 0 23px;height:23px;border-radius:50%;display:grid;place-items:center;background:#17394a;color:var(--cyan);font-size:11px;font-weight:900}
+    .statusbox{display:none;margin:0 15px 15px;border:1px solid #354b60;border-radius:13px;padding:13px;background:#0a121d}.statusline{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:750}.dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px currentColor}.dot.live{background:var(--green)}.statusdetail{color:var(--muted);font-size:11px;margin:7px 0 0 17px;line-height:1.5}
+    .account{display:none;margin:0 15px 15px;padding:15px;border:1px solid #287c68;border-radius:14px;background:#0d241f}.account h3{font-size:12px;letter-spacing:.1em;margin:0 0 12px;color:#a8f5d9}.account p{font-size:12px;color:#d2e8df;line-height:1.6;margin:5px 0}
+    .security{display:flex;gap:12px;align-items:center;margin-top:16px;padding:16px;border:1px solid #68552e;border-radius:15px;background:linear-gradient(110deg,#241d12,#171710);color:#e8d6b2;font-size:12px;line-height:1.5}.lock{width:38px;height:38px;flex:0 0 38px;border-radius:12px;display:grid;place-items:center;background:#4b3920;color:#ffd17a;font-size:19px}.security b{display:block;color:#ffe3aa;margin-bottom:3px}
+    .benefits{margin-top:28px}.benefits h2{font-size:20px;font-weight:550;margin:0 0 15px}.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.feature{min-height:130px;padding:15px 9px;border:1px solid #4b6071;border-radius:17px;background:linear-gradient(145deg,#1b2937,#101923);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:0 10px 25px #0005}.feature-icon{font-size:30px;margin-bottom:10px;filter:drop-shadow(0 0 10px #56dfff55)}.feature b{font-size:12px;font-weight:550;line-height:1.4}
+    .help{margin-top:20px;border:1px solid #405264;border-radius:20px;background:linear-gradient(120deg,#17212d,#101720);padding:18px}.help h2{font-size:19px;margin:0 0 7px}.help p{font-size:12px;line-height:1.6;color:var(--muted);margin:0}
+    .foot{text-align:center;color:#78899a;font:11px ui-monospace,monospace;letter-spacing:.09em;margin:26px 0 0}
+    @media(min-width:700px){body{padding-top:34px}.connect-card{padding:30px}.feature{min-height:145px}}
+    @media(max-width:390px){body{padding:17px 11px 25px}.mark{width:46px;height:46px}.secure{font-size:9px;padding:8px}.connect-card{padding:17px}.timer-area{grid-template-columns:90px 1fr;gap:10px}.timer{width:84px;height:84px}.timer strong{font-size:20px}.feature{min-height:120px;padding:12px 5px}.feature b{font-size:11px}}
+    @media(prefers-reduced-motion:no-preference){.connect-card{animation:rise .6s ease both}.feature{transition:transform .2s,border-color .2s}.feature:hover{transform:translateY(-3px);border-color:var(--cyan)}@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}}
   </style>
 </head>
 <body>
   <div class="shell">
     <header>
-      <div class="brand"><img class="mark" src="/castro-md-icon.png" alt="CASTRO-MD"><div><strong>CASTRO-MD</strong><small>WHATSAPP CONNECTION CENTRE</small></div></div>
+      <div class="brand"><img class="mark" src="/castro-md-icon.png" alt="CASTRO-MD"><div><strong>CASTRO-MD</strong><small>WhatsApp Connection Centre</small></div></div>
       <div class="secure">✦ SECURE PAIRING</div>
     </header>
-    <section class="hero">
-      <div class="eyebrow">Your bot. Your control.</div>
-      <h1>Connect your <span style="color:var(--cyan)">WhatsApp</span></h1>
-      <p>Link your account to CASTRO-MD in a few simple steps. Your connection is stored securely and managed separately from other users.</p>
-    </section>
-    <main class="layout">
-      <section class="card">
-        <h2>Start a new connection</h2>
-        <div class="muted">Enter your WhatsApp number in international format, including your country code.</div>
+    <section class="hero"><div class="eyebrow">YOUR BOT. YOUR CONTROL.</div><h1>Connect your <span>WhatsApp</span></h1></section>
+    <main>
+      <section class="connect-card">
+        <h2 class="card-title">Start a new connection</h2>
         <form id="pairForm">
           <label for="number">WHATSAPP PHONE NUMBER</label>
-          <input id="number" name="number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="2547XXXXXXXX" required minlength="8" maxlength="15">
-          <button class="primary" id="submit" type="submit">GENERATE PAIRING CODE&nbsp; →</button>
+          <div class="input-wrap"><span class="flag" aria-hidden="true">🇰🇪</span><input id="number" name="number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="+2547XXXXXXXX" required minlength="8" maxlength="16" aria-label="WhatsApp phone number"></div>
+          <button class="primary" id="submit" type="submit">GENERATE PAIRING CODE&nbsp; → &nbsp;◉</button>
           <div class="error" id="error" role="alert"></div>
         </form>
         <section class="result" id="result" aria-live="polite">
-          <div class="result-label">YOUR ONE-TIME PAIRING CODE</div>
-          <div class="code" id="code"></div>
-          <button class="secondary" id="copyCode" type="button">COPY PAIRING CODE</button>
-          <div class="muted" id="copyHint" style="text-align:center;margin-top:8px" aria-live="polite"></div>
+          <div class="result-head"><span>PAIRING ACTIVE</span><span id="pairingLabel">ONE-TIME CODE</span></div>
+          <div class="code-row"><div class="code" id="code"></div><button class="copy" id="copyCode" type="button">COPY</button></div>
+          <div class="timer-area"><div class="timer"><strong id="countdown">03:00</strong><small>SECS</small></div><div class="timer-copy"><b>TIME TO LINK</b><p>Enter this code in WhatsApp using <b>Link with phone number instead</b>. Keep this page open while you connect.</p></div></div>
           <div class="steps">
             <div class="step"><span class="num">1</span><span>Open WhatsApp on the phone you want to connect.</span></div>
             <div class="step"><span class="num">2</span><span>Go to <b>Linked devices → Link a device</b>.</span></div>
             <div class="step"><span class="num">3</span><span>Choose <b>Link with phone number instead</b> and enter the code above.</span></div>
           </div>
-          <div class="statusbox" id="statusBox">
-            <div class="statusline"><span class="dot" id="statusDot"></span><span id="statusTitle">Waiting for WhatsApp confirmation…</span></div>
-            <p class="statusdetail" id="statusDetail">Keep this page open. We'll check the connection automatically.</p>
-          </div>
-          <div class="statusbox" id="accountBox" style="display:none">
-            <div class="statusline"><span class="dot live"></span><span>YOUR CASTRO-MD ACCOUNT</span></div>
-            <div class="steps" style="margin-top:13px">
-              <div class="step"><span class="num">✓</span><span><b>Connection:</b> <span id="accountStatus">Connected</span></span></div>
-              <div class="step"><span class="num">◷</span><span><b>Connected since:</b> <span id="connectedSince">—</span></span></div>
-              <div class="step"><span class="num">↻</span><span><b>Last connection check:</b> <span id="lastSeen">—</span></span></div>
-            </div>
-            <p class="statusdetail" style="margin:12px 0 0">Open WhatsApp and send <b>.menu</b> to your CASTRO-MD bot to explore its commands.</p>
-          </div>
+          <div class="statusbox" id="statusBox"><div class="statusline"><span class="dot" id="statusDot"></span><span id="statusTitle">Waiting for WhatsApp confirmation…</span></div><p class="statusdetail" id="statusDetail">Complete the linking steps in WhatsApp; this page checks automatically.</p></div>
+          <div class="account" id="accountBox"><h3>✓ YOUR CASTRO-MD ACCOUNT</h3><p><b>Connection:</b> <span id="accountStatus">Connected</span></p><p><b>Connected since:</b> <span id="connectedSince">—</span></p><p><b>Last connection check:</b> <span id="lastSeen">—</span></p><p>Open WhatsApp and send <b>.menu</b> to your CASTRO-MD bot to get started.</p></div>
         </section>
       </section>
-      <aside class="side">
-        <section class="card">
-          <h2>Connection benefits</h2>
-          <div class="feature"><div class="icon">⚡</div><div><b>Fast setup</b><span>Generate a pairing code and connect without copying session files.</span></div></div>
-          <div class="feature"><div class="icon">◉</div><div><b>Live connection check</b><span>See when WhatsApp confirms your account is connected.</span></div></div>
-          <div class="feature"><div class="icon">⌘</div><div><b>Your own bot account</b><span>Your bot settings and account are isolated from other users.</span></div></div>
-        </section>
-        <div class="notice"><b>Keep your code private.</b><br>Never share your pairing code with anyone. CASTRO-MD support will never ask you to send your code or session credentials.</div>
-        <section class="card"><h2>Need help?</h2><p class="muted" style="margin-bottom:0">If a code expires or pairing fails, wait briefly and request a fresh code. Make sure the WhatsApp number you enter is the same account you are linking.</p></section>
-      </aside>
+      <div class="security"><div class="lock">▣</div><div><b>KEEP YOUR CODE PRIVATE.</b>Never share your pairing code or session credentials. CASTRO-MD support will never ask for them.</div></div>
+      <section class="benefits"><h2>Connection benefits</h2><div class="feature-grid">
+        <div class="feature"><div class="feature-icon">⚡</div><b>Fast setup</b></div>
+        <div class="feature"><div class="feature-icon">◉</div><b>Live connection<br>check</b></div>
+        <div class="feature"><div class="feature-icon">⬡</div><b>Your own<br>bot account</b></div>
+      </div></section>
+      <section class="help"><h2>Need help?</h2><p>If a code expires or pairing fails, request a fresh code. Make sure the number entered is the same WhatsApp account you are linking.</p></section>
     </main>
     <p class="foot">BLACK • GOLD • ELECTRIC BLUE &nbsp;|&nbsp; POWERED BY CASTRO</p>
   </div>
@@ -107,15 +97,15 @@
     if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
     const form=document.getElementById('pairForm'),button=document.getElementById('submit'),error=document.getElementById('error');
     const result=document.getElementById('result'),codeElement=document.getElementById('code'),copyButton=document.getElementById('copyCode');
-    const copyHint=document.getElementById('copyHint'),statusBox=document.getElementById('statusBox'),statusDot=document.getElementById('statusDot');
+    const statusBox=document.getElementById('statusBox'),statusDot=document.getElementById('statusDot');
     const statusTitle=document.getElementById('statusTitle'),statusDetail=document.getElementById('statusDetail');
     const accountBox=document.getElementById('accountBox'),connectedSince=document.getElementById('connectedSince'),lastSeen=document.getElementById('lastSeen');
+    const countdown=document.getElementById('countdown');
     const dateLabel=value=>value?new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Not available';
-    let pollTimer=null,activePairId=null;
-    const cleanUrl=new URL(window.location.href);let cleaned=false;
-    for(const key of [...cleanUrl.searchParams.keys()]){if(key.toLowerCase().startsWith('utm_')){cleanUrl.searchParams.delete(key);cleaned=true;}}
-    if(cleaned)window.history.replaceState({},document.title,cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);
+    let pollTimer=null,countdownTimer=null,activePairId=null,expiresAt=0;
     function stopPolling(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+    function stopCountdown(){if(countdownTimer){clearInterval(countdownTimer);countdownTimer=null;}}
+    function updateCountdown(){const remaining=Math.max(0,Math.ceil((expiresAt-Date.now())/1000));countdown.textContent=String(Math.floor(remaining/60)).padStart(2,'0')+':'+String(remaining%60).padStart(2,'0');if(!remaining){stopCountdown();}}
     async function checkStatus(){
       if(!activePairId)return;
       try{
@@ -123,14 +113,14 @@
         if(!response.ok)return;
         const data=await response.json();
         if(data.status==='connected'){
-          stopPolling();statusDot.classList.add('live');statusTitle.textContent='WhatsApp connected successfully!';
-          statusDetail.textContent='Your CASTRO-MD account is online. Open WhatsApp and send .menu to get started.';
+          stopPolling();stopCountdown();statusDot.classList.add('live');statusTitle.textContent='WhatsApp connected successfully!';
+          statusDetail.textContent='Your CASTRO-MD account is online. Send .menu in WhatsApp to get started.';
           accountBox.style.display='block';connectedSince.textContent=dateLabel(data.connectedAt);lastSeen.textContent=dateLabel(data.lastSeenAt);
         }else if(data.status==='disconnected'||data.status==='needs_pairing'){
           stopPolling();statusTitle.textContent='Connection needs attention';statusDetail.textContent='The account is not connected. Request a fresh pairing code and try again.';
         }else{
           statusTitle.textContent='Waiting for WhatsApp confirmation…';
-          statusDetail.textContent='Your code has been generated. Complete the linking steps in WhatsApp; this page will update automatically.';
+          statusDetail.textContent='Complete the linking steps in WhatsApp; this page will update automatically.';
         }
       }catch(_){statusDetail.textContent='Connection check temporarily unavailable. We will keep trying.';}
     }
@@ -139,14 +129,14 @@
       try{
         if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(code);
         else{const helper=document.createElement('textarea');helper.value=code;helper.style.position='fixed';helper.style.opacity='0';document.body.appendChild(helper);helper.select();const copied=document.execCommand('copy');helper.remove();if(!copied)throw new Error('Copy unavailable');}
-        copyButton.textContent='COPIED ✓';copyHint.textContent='Copied. Enter it in WhatsApp to finish linking.';
-      }catch(_){copyHint.textContent='Copy was blocked. Press and hold the code to copy it.';}
-      setTimeout(()=>copyButton.textContent='COPY PAIRING CODE',2200);
+        copyButton.textContent='COPIED ✓';
+      }catch(_){copyButton.textContent='HOLD TO COPY';}
+      setTimeout(()=>copyButton.textContent='COPY',2200);
     });
     form.addEventListener('submit',async event=>{
-      event.preventDefault();stopPolling();activePairId=null;
+      event.preventDefault();stopPolling();stopCountdown();activePairId=null;
       const number=document.getElementById('number').value.replace(/\D/g,'');
-      error.textContent='';result.style.display='none';statusBox.style.display='none';
+      error.textContent='';result.style.display='none';statusBox.style.display='none';accountBox.style.display='none';
       if(number.length<8||number.length>15){error.textContent='Enter a valid number with country code.';return;}
       button.disabled=true;button.textContent='REQUESTING SECURE CODE…';
       try{
@@ -155,14 +145,14 @@
         try{data=JSON.parse(body);}catch(_){throw new Error(response.status>=502?'The pairing service is temporarily unavailable. Try again shortly.':'The server returned an unexpected response.');}
         if(!response.ok)throw new Error(data.error||'Pairing request failed.');
         if(typeof data.code!=='string'||!data.code.trim()||typeof data.pairingId!=='string')throw new Error('The service returned an incomplete pairing response. Please try again.');
-        codeElement.textContent=data.code.trim();activePairId=data.pairingId;
-        copyButton.textContent='COPY PAIRING CODE';copyHint.textContent='';result.style.display='block';statusBox.style.display='block';
+        codeElement.textContent=data.code.trim();activePairId=data.pairingId;result.style.display='block';statusBox.style.display='block';
         statusDot.classList.remove('live');statusTitle.textContent='Waiting for WhatsApp confirmation…';
+        expiresAt=Date.now()+180000;updateCountdown();countdownTimer=setInterval(updateCountdown,1000);
         await checkStatus();pollTimer=setInterval(checkStatus,4000);
       }catch(err){error.textContent=err.message||'Could not reach the pairing service. Try again.';}
-      finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE →';}
+      finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE → ◉';}
     });
-    window.addEventListener('beforeunload',stopPolling);
+    window.addEventListener('beforeunload',()=>{stopPolling();stopCountdown();});
   </script>
 </body>
 </html>
