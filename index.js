@@ -527,6 +527,12 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/dashboard/resend' && req.method === 'POST') {
+      const origin = String(req.headers.origin || '');
+      try {
+        if (!origin || new URL(origin).host !== String(req.headers.host || '')) return json(res, 403, { error: 'Request origin could not be verified.' });
+      } catch {
+        return json(res, 403, { error: 'Request origin could not be verified.' });
+      }
       const requestIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(requestIp)) return json(res, 429, { error: 'Too many requests. Wait a few minutes and try again.' });
       try {
