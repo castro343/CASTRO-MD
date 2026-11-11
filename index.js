@@ -255,8 +255,21 @@ function launchTenant(tenant, pairingNumber = '') {
       const pending = tenantRestartTimers.get(tenant.id);
       if (pending) clearTimeout(pending);
       tenantRestartTimers.delete(tenant.id);
-      try { await (await getTenantRegistry()).markConnected(tenant.id); }
-      catch (e) { log.error('Could not update tenant connection status:', e.message); }
+      try {
+        const registry = await getTenantRegistry();
+        await registry.markConnected(tenant.id);
+        // Dashboard ownership is proved only by a short-lived message sent to the
+        // WhatsApp account that has just completed pairing. The raw token is never
+        // stored in MongoDB or returned by a public HTTP endpoint.
+        const claimToken = require('crypto').randomBytes(32).toString('hex');
+        const claimHash = require('crypto').createHash('sha256').update(claimToken).digest('hex');
+        const claimExpiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        const saved = await registry.createDashboardClaim(tenant.id, claimHash, claimExpiresAt);
+        const worker = tenantWorkers.get(tenant.id);
+        if (saved && worker && worker.exitCode === null && !worker.killed) {
+          worker.send({ type: 'dashboard-claim', tenantId: tenant.id, token: claimToken });
+        }
+      } catch (e) { log.error('Could not prepare customer dashboard claim:', e.message); }
     }
     if (message.type === 'connection-replaced') {
       tenantRestartAttempts.set(tenant.id, -1);
@@ -466,6 +479,53 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         log.error('Could not check pairing status:', e.message);
         return json(res, 503, { error: 'Connection status is temporarily unavailable.' });
+      }
+    }
+
+    if (url.pathname === '/api/dashboard/claim' && req.method === 'POST') {
+      try {
+        let raw = '';
+        for await (const chunk of req) {
+          raw += chunk;
+          if (raw.length > 4096) return json(res, 413, { error: 'Request too large.' });
+        }
+        const body = JSON.parse(raw || '{}');
+        const token = String(body.token || '');
+        if (!/^[a-f0-9]{64}$/.test(token)) return json(res, 400, { error: 'Enter the one-time code sent to your paired WhatsApp account.' });
+        const crypto = require('crypto');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const registry = await getTenantRegistry();
+        const claimed = await registry.consumeDashboardClaim(tokenHash);
+        if (!claimed) return json(res, 401, { error: 'That claim code is invalid, expired, or already used.' });
+        const sessionToken = crypto.randomBytes(32).toString('hex');
+        const sessionHash = crypto.createHash('sha256').update(sessionToken).digest('hex');
+        const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+        await registry.createDashboardSession(claimed.id, sessionHash, expiresAt);
+        res.writeHead(200, {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store',
+          'Set-Cookie': `castro_dashboard=${sessionToken}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=604800`,
+        });
+        return res.end(JSON.stringify({ ok: true, expiresAt }));
+      } catch (e) {
+        log.warn('Customer dashboard claim failed:', e.message);
+        return json(res, 400, { error: 'Could not verify that claim code. Request a new one from your paired account.' });
+      }
+    }
+
+    if (url.pathname === '/api/dashboard/me' && req.method === 'GET') {
+      try {
+        const cookieHeader = String(req.headers.cookie || '');
+        const rawToken = cookieHeader.split(';').map((part) => part.trim()).find((part) => part.startsWith('castro_dashboard='))?.slice('castro_dashboard='.length) || '';
+        if (!/^[a-f0-9]{64}$/.test(rawToken)) return json(res, 401, { error: 'Sign in required.' });
+        const hash = require('crypto').createHash('sha256').update(rawToken).digest('hex');
+        const account = await (await getTenantRegistry()).getDashboardSession(hash);
+        if (!account) return json(res, 401, { error: 'Your dashboard session has expired. Sign in again.' });
+        const tenant = await (await getTenantRegistry()).get(account.id);
+        return json(res, 200, { authenticated: true, status: tenant.status, botName: tenant.botName, prefix: tenant.prefix });
+      } catch (e) {
+        log.error('Could not verify dashboard session:', e.message);
+        return json(res, 503, { error: 'Dashboard is temporarily unavailable.' });
       }
     }
 
@@ -932,8 +992,9 @@ process.once('SIGINT', () => gracefulShutdown('SIGINT'));
 
 if (tenantId) {
   // Wait for the manager to attach IPC listeners before opening WhatsApp.
-  process.once('message', (message) => {
-    if (message?.type === 'start' && message.tenantId === tenantId) {
+  process.on('message', async (message) => {
+    if (!message || message.tenantId !== tenantId) return;
+    if (message.type === 'start') {
       start().catch((error) => {
         log.error('Tenant worker startup failed:', error.message);
         if (process.send) {
@@ -941,6 +1002,30 @@ if (tenantId) {
         }
         process.exit(1);
       });
+    }
+    if (message.type === 'dashboard-claim' && /^[a-f0-9]{64}$/.test(String(message.token || ''))) {
+      try {
+        const sock = activeSocket;
+        if (!sock?.user?.id || !activeSocketReady) return;
+        const claimUrl = (process.env.PUBLIC_PAIRING_URL || 'https://castro-md-runtime.onrender.com/pair').replace(/\\/pair\\/?$/, '/dashboard');
+        await sock.sendMessage(sock.user.id, {
+          text: [
+            '*CASTRO-MD DASHBOARD VERIFICATION*',
+            '',
+            'A customer dashboard sign-in was prepared for this WhatsApp account.',
+            'Open the dashboard and enter this one-time verification code:',
+            '',
+            message.token,
+            '',
+            'This code expires in 10 minutes and works once. Never share it with anyone.',
+            claimUrl,
+            '',
+            'If you did not request this, ignore this message.',
+          ].join('\\n'),
+        });
+      } catch (error) {
+        log.warn('Could not deliver dashboard verification message.');
+      }
     }
   });
 } else {
