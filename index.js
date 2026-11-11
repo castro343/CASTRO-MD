@@ -456,9 +456,13 @@ const server = http.createServer(async (req, res) => {
       try {
         const tenant = await (await getTenantRegistry()).get(id);
         if (!tenant) return json(res, 404, { error: 'Pairing reference not found.' });
-        // The random pairing reference is an opaque, short-lived capability. Return status only:
-        // never expose the phone number, tenant record, session data, or authentication material.
-        return json(res, 200, { status: tenant.status });
+        // The unguessable tenant reference exposes only non-sensitive connection metadata.
+        // Never return phone numbers, tenant records, settings, session data, or credentials.
+        return json(res, 200, {
+          status: tenant.status,
+          connectedAt: tenant.connectedAt || null,
+          lastSeenAt: tenant.lastSeenAt || null,
+        });
       } catch (e) {
         log.error('Could not check pairing status:', e.message);
         return json(res, 503, { error: 'Connection status is temporarily unavailable.' });
