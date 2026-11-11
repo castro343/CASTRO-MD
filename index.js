@@ -1018,7 +1018,7 @@ if (tenantId) {
       try {
         const sock = activeSocket;
         if (!sock?.user?.id || !activeSocketReady) return;
-        const claimUrl = (process.env.PUBLIC_PAIRING_URL || 'https://castro-md-runtime.onrender.com/pair').replace(/\\/pair\\/?$/, '/dashboard');
+        const claimUrl = (process.env.PUBLIC_PAIRING_URL || 'https://castro-md-runtime.onrender.com/pair').replace(/\/pair\/?$/, '/dashboard');
         await sock.sendMessage(sock.user.id, {
           text: [
             '*CASTRO-MD DASHBOARD VERIFICATION*',
@@ -1032,7 +1032,7 @@ if (tenantId) {
             claimUrl,
             '',
             'If you did not request this, ignore this message.',
-          ].join('\\n'),
+          ].join('\n'),
         });
       } catch (error) {
         log.warn('Could not deliver dashboard verification message.');
