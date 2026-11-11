@@ -79,6 +79,15 @@
             <div class="statusline"><span class="dot" id="statusDot"></span><span id="statusTitle">Waiting for WhatsApp confirmation…</span></div>
             <p class="statusdetail" id="statusDetail">Keep this page open. We'll check the connection automatically.</p>
           </div>
+          <div class="statusbox" id="accountBox" style="display:none">
+            <div class="statusline"><span class="dot live"></span><span>YOUR CASTRO-MD ACCOUNT</span></div>
+            <div class="steps" style="margin-top:13px">
+              <div class="step"><span class="num">✓</span><span><b>Connection:</b> <span id="accountStatus">Connected</span></span></div>
+              <div class="step"><span class="num">◷</span><span><b>Connected since:</b> <span id="connectedSince">—</span></span></div>
+              <div class="step"><span class="num">↻</span><span><b>Last connection check:</b> <span id="lastSeen">—</span></span></div>
+            </div>
+            <p class="statusdetail" style="margin:12px 0 0">Open WhatsApp and send <b>.menu</b> to your CASTRO-MD bot to explore its commands.</p>
+          </div>
         </section>
       </section>
       <aside class="side">
@@ -100,6 +109,8 @@
     const result=document.getElementById('result'),codeElement=document.getElementById('code'),copyButton=document.getElementById('copyCode');
     const copyHint=document.getElementById('copyHint'),statusBox=document.getElementById('statusBox'),statusDot=document.getElementById('statusDot');
     const statusTitle=document.getElementById('statusTitle'),statusDetail=document.getElementById('statusDetail');
+    const accountBox=document.getElementById('accountBox'),connectedSince=document.getElementById('connectedSince'),lastSeen=document.getElementById('lastSeen');
+    const dateLabel=value=>value?new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Not available';
     let pollTimer=null,activePairId=null;
     const cleanUrl=new URL(window.location.href);let cleaned=false;
     for(const key of [...cleanUrl.searchParams.keys()]){if(key.toLowerCase().startsWith('utm_')){cleanUrl.searchParams.delete(key);cleaned=true;}}
@@ -114,6 +125,7 @@
         if(data.status==='connected'){
           stopPolling();statusDot.classList.add('live');statusTitle.textContent='WhatsApp connected successfully!';
           statusDetail.textContent='Your CASTRO-MD account is online. Open WhatsApp and send .menu to get started.';
+          accountBox.style.display='block';connectedSince.textContent=dateLabel(data.connectedAt);lastSeen.textContent=dateLabel(data.lastSeenAt);
         }else if(data.status==='disconnected'||data.status==='needs_pairing'){
           stopPolling();statusTitle.textContent='Connection needs attention';statusDetail.textContent='The account is not connected. Request a fresh pairing code and try again.';
         }else{
