@@ -388,6 +388,17 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === '/dashboard' || url.pathname === '/dashboard.html') {
+      try {
+        const page = fs.readFileSync(path.join(__dirname, 'public', 'dashboard.html'));
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
+        return res.end(page);
+      } catch {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        return res.end('Dashboard not found');
+      }
+    }
+
     if (url.pathname === '/pair' || url.pathname === '/pair.html') {
       try {
         const page = fs.readFileSync(path.join(__dirname, 'public', 'pair.html'));
