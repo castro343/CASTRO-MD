@@ -66,7 +66,7 @@ const limited = (ip) => {
   return list.length > 5;
 };
 const json = (res, status, body) => {
-  res.writeHead(status, { 'Content-Type': 'application/json' });
+  res.writeHead(status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   res.end(JSON.stringify(body));
 };
 
@@ -494,6 +494,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (url.pathname === '/api/dashboard/claim' && req.method === 'POST') {
+      const claimIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      if (limited(claimIp)) return json(res, 429, { error: 'Too many verification attempts. Wait a few minutes and try again.' });
       try {
         let raw = '';
         for await (const chunk of req) {
