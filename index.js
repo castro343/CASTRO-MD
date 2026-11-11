@@ -526,6 +526,40 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === '/api/dashboard/settings' && req.method === 'PATCH') {
+      const origin = String(req.headers.origin || '');
+      const host = String(req.headers.host || '');
+      if (!origin || new URL(origin).host !== host) return json(res, 403, { error: 'Request origin could not be verified.' });
+      try {
+        const cookieHeader = String(req.headers.cookie || '');
+        const rawToken = cookieHeader.split(';').map((part) => part.trim()).find((part) => part.startsWith('castro_dashboard='))?.slice('castro_dashboard='.length) || '';
+        if (!/^[a-f0-9]{64}$/.test(rawToken)) return json(res, 401, { error: 'Sign in required.' });
+        const crypto = require('crypto');
+        const hash = crypto.createHash('sha256').update(rawToken).digest('hex');
+        const registry = await getTenantRegistry();
+        const account = await registry.getDashboardSession(hash);
+        if (!account) return json(res, 401, { error: 'Your dashboard session has expired. Sign in again.' });
+        let raw = '';
+        for await (const chunk of req) {
+          raw += chunk;
+          if (raw.length > 4096) return json(res, 413, { error: 'Request too large.' });
+        }
+        const body = JSON.parse(raw || '{}');
+        const allowedKeys = ['botName', 'prefix', 'autoRead', 'autoViewStatus', 'statusReact'];
+        if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some((key) => !allowedKeys.includes(key)) || allowedKeys.some((key) => !(key in body))) {
+          return json(res, 400, { error: 'Submit all supported settings using the dashboard controls.' });
+        }
+        const saved = await registry.updateSettings(account.id, body);
+        const worker = tenantWorkers.get(account.id);
+        if (worker && worker.exitCode === null && !worker.killed) {
+          worker.send({ type: 'settings-update', tenantId: account.id, settings: saved });
+        }
+        return json(res, 200, { ok: true, settings: saved });
+      } catch (e) {
+        return json(res, 400, { error: e.message || 'Could not save customer settings.' });
+      }
+    }
+
     if (url.pathname === '/api/dashboard/me' && req.method === 'GET') {
       try {
         const cookieHeader = String(req.headers.cookie || '');
@@ -535,7 +569,7 @@ const server = http.createServer(async (req, res) => {
         const account = await (await getTenantRegistry()).getDashboardSession(hash);
         if (!account) return json(res, 401, { error: 'Your dashboard session has expired. Sign in again.' });
         const tenant = await (await getTenantRegistry()).get(account.id);
-        return json(res, 200, { authenticated: true, status: tenant.status, botName: tenant.botName, prefix: tenant.prefix });
+        return json(res, 200, { authenticated: true, status: tenant.status, settings: tenant.settings });
       } catch (e) {
         log.error('Could not verify dashboard session:', e.message);
         return json(res, 503, { error: 'Dashboard is temporarily unavailable.' });
@@ -1015,6 +1049,15 @@ if (tenantId) {
         }
         process.exit(1);
       });
+    }
+    if (message.type === 'settings-update' && message.settings && tenantId) {
+      const next = message.settings;
+      if (typeof next.botName === 'string' && /^[A-Za-z0-9 _-]{2,32}$/.test(next.botName)) settings.botName = next.botName;
+      if (typeof next.prefix === 'string' && /^[^\\s]{1,3}$/.test(next.prefix)) settings.prefix = next.prefix;
+      if (typeof next.autoRead === 'boolean') settings.autoRead = next.autoRead;
+      if (typeof next.autoViewStatus === 'boolean') settings.autoViewStatus = next.autoViewStatus;
+      if (typeof next.statusReact === 'boolean') settings.statusReact = next.statusReact;
+      log.info('Customer dashboard settings updated for this tenant.');
     }
     if (message.type === 'dashboard-claim' && /^[a-f0-9]{64}$/.test(String(message.token || ''))) {
       try {
