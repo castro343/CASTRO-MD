@@ -4,125 +4,153 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#080b12">
-  <meta name="description" content="CASTRO-MD WhatsApp companion and pairing app.">
+  <meta name="description" content="Securely connect your WhatsApp account to CASTRO-MD.">
   <meta name="application-name" content="CASTRO-MD">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="CASTRO-MD">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/castro-md-icon.png" type="image/svg+xml">
+  <link rel="icon" href="/castro-md-icon.png" type="image/png">
   <link rel="apple-touch-icon" href="/castro-md-icon.png">
-  <title>CASTRO-MD | Pair WhatsApp</title>
+  <title>CASTRO-MD | Connect WhatsApp</title>
   <style>
-    :root{color-scheme:dark;--bg:#080b12;--panel:#111722;--gold:#d9ad4b;--blue:#28a9ff;--muted:#9aa7b8}
+    :root{color-scheme:dark;--bg:#070b12;--panel:#101927;--line:#25364b;--gold:#e3b64f;--blue:#35b8ff;--cyan:#72e1ff;--muted:#9aaabd;--green:#37d99a;--red:#ff7777}
     *{box-sizing:border-box}
-    body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at 15% 10%,#142c45 0,transparent 42%),radial-gradient(ellipse at 90% 85%,#342713 0,transparent 35%),var(--bg);font-family:Inter,system-ui,Arial,sans-serif;color:#f5f7fb}
-    .card{width:min(100%,460px);padding:34px;border:1px solid #293448;border-radius:24px;background:linear-gradient(145deg,rgba(20,29,43,.97),rgba(10,14,22,.97));box-shadow:0 24px 90px #0009}
-    .mark{width:74px;height:74px;display:block;border-radius:20px;object-fit:cover;border:1px solid #8b62ff;box-shadow:0 0 30px #8b45ff55}
-    h1{margin:22px 0 7px;font-size:29px;letter-spacing:.08em}
-    .sub{margin:0 0 22px;color:var(--muted);line-height:1.6}
-    label{display:block;margin:0 0 9px;font-size:13px;font-weight:700;color:#dce5f2}
-    input{width:100%;padding:15px 16px;border:1px solid #34445a;border-radius:12px;background:#080e18;color:white;font-size:16px;outline:none}
-    input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #28a9ff20}
-    button{width:100%;margin-top:14px;padding:15px;border:0;border-radius:12px;background:linear-gradient(100deg,var(--gold),#f1d58b);color:#17120a;font-weight:900;font-size:15px;cursor:pointer}
-    button:disabled{opacity:.55;cursor:wait}
-    .copy-btn{margin-top:12px;background:linear-gradient(100deg,#1689d2,#54c5ff);color:#041321}
-    .copy-btn.copied{background:linear-gradient(100deg,#20b879,#8be6b5);color:#04180f}
-    .result{display:none;margin-top:20px;padding:18px;border:1px solid #24527a;border-radius:14px;background:#0b1c2b}
-    .code{margin:8px 0;color:#7bcaff;font-size:27px;font-weight:900;letter-spacing:.14em;text-align:center;overflow-wrap:anywhere}
-    .hint,.foot{font-size:12px;line-height:1.6;color:var(--muted)}
-    .error{margin-top:14px;color:#ff8b8b;font-size:13px}
-    .foot{margin-top:24px;text-align:center}
+    body{margin:0;min-height:100vh;padding:26px 16px 40px;background:radial-gradient(ellipse at 12% 4%,#12304c 0,transparent 36%),radial-gradient(ellipse at 90% 90%,#302515 0,transparent 30%),var(--bg);font-family:Inter,ui-sans-serif,system-ui,-apple-system,Segoe UI,sans-serif;color:#f5f8fc}
+    .shell{width:min(100%,1040px);margin:auto}
+    header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:0 0 34px}
+    .brand{display:flex;align-items:center;gap:13px}.mark{width:48px;height:48px;border-radius:15px;object-fit:cover;border:1px solid #5a7aa0;box-shadow:0 0 25px #2aaeff30}
+    .brand strong{display:block;letter-spacing:.13em;font-size:15px}.brand small{display:block;color:var(--muted);margin-top:4px;font-size:11px;letter-spacing:.08em}
+    .secure{font-size:11px;color:#b8c9dc;border:1px solid var(--line);border-radius:30px;padding:9px 12px;background:#0c1420}
+    .hero{text-align:center;max-width:680px;margin:0 auto 28px}.eyebrow{color:var(--cyan);font-size:11px;font-weight:800;letter-spacing:.2em;text-transform:uppercase}
+    h1{font-size:clamp(30px,6vw,48px);letter-spacing:-.045em;line-height:1.08;margin:12px 0}.hero p{color:var(--muted);line-height:1.7;margin:0 auto;max-width:580px;font-size:14px}
+    .layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(270px,.85fr);gap:18px;align-items:start}
+    .card{border:1px solid var(--line);border-radius:23px;background:linear-gradient(145deg,#121d2cF5,#0b111cf5);box-shadow:0 22px 70px #0006;padding:25px}
+    .card h2{font-size:17px;margin:0 0 7px}.muted{color:var(--muted);font-size:12px;line-height:1.65}
+    label{display:block;font-size:12px;font-weight:750;margin:23px 0 9px;color:#dce8f5}
+    input{width:100%;padding:15px 16px;border:1px solid #344961;border-radius:13px;background:#080f19;color:#fff;font-size:16px;outline:none}
+    input:focus{border-color:var(--blue);box-shadow:0 0 0 3px #35b8ff20}
+    .primary,.secondary{width:100%;border:0;border-radius:13px;padding:15px;font-size:13px;font-weight:900;letter-spacing:.04em;cursor:pointer;margin-top:13px}
+    .primary{background:linear-gradient(100deg,var(--gold),#f4d98e);color:#1b1508}.primary:disabled{opacity:.55;cursor:wait}
+    .secondary{background:linear-gradient(100deg,#147fc0,#51c9ff);color:#031522}
+    .error{color:var(--red);font-size:12px;line-height:1.5;margin-top:12px;min-height:18px}
+    .result{display:none;margin-top:20px;padding:18px;border:1px solid #245d83;border-radius:16px;background:linear-gradient(145deg,#0b2234,#0b1724)}
+    .result-label{text-align:center;color:#b7d8ed;font-size:11px}.code{font-size:clamp(25px,6vw,34px);font-weight:950;letter-spacing:.16em;color:#7bd4ff;text-align:center;margin:10px 0;overflow-wrap:anywhere}
+    .steps{display:grid;gap:12px;margin-top:19px}.step{display:flex;gap:11px;align-items:flex-start;color:#c6d3e2;font-size:12px;line-height:1.55}.num{flex:0 0 24px;height:24px;border-radius:50%;display:grid;place-items:center;background:#183a54;color:var(--cyan);font-size:11px;font-weight:900}
+    .statusbox{display:none;margin-top:16px;border:1px solid var(--line);border-radius:13px;padding:13px;background:#0a121d}.statusline{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:750}.dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px currentColor}.dot.live{background:var(--green)}.statusdetail{color:var(--muted);font-size:11px;margin:7px 0 0 17px;line-height:1.5}
+    .side{display:grid;gap:15px}.feature{display:flex;gap:13px;padding:13px 0;border-bottom:1px solid #233246}.feature:last-child{border:0;padding-bottom:0}.icon{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#142c40;color:var(--cyan);font-size:16px;flex:0 0 34px}.feature b{display:block;font-size:12px;margin-bottom:4px}.feature span{display:block;color:var(--muted);font-size:11px;line-height:1.5}
+    .notice{border:1px solid #5a4828;background:#201a10;border-radius:15px;padding:15px;color:#e9d6ad;font-size:11px;line-height:1.65}.notice b{color:#ffe2a0}
+    .foot{text-align:center;color:#74849a;font-size:10px;letter-spacing:.12em;margin:28px 0 0}
+    @media(max-width:760px){.layout{grid-template-columns:1fr}.card{padding:21px}header{margin-bottom:27px}.secure{font-size:10px}}
   </style>
 </head>
 <body>
-  <main class="card">
-    <img class="mark" src="/castro-md-icon.png" alt="CASTRO-MD app icon">
-    <h1>CASTRO-MD</h1>
-    <p class="sub">Link CASTRO-MD directly from WhatsApp. No session ID copying is required.</p>
-    <form id="pairForm">
-      <label for="number">WhatsApp number with country code</label>
-      <input id="number" name="number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="2547XXXXXXXX" required minlength="8" maxlength="15">
-      <button id="submit" type="submit">GENERATE PAIRING CODE</button>
-      <div class="error" id="error" role="alert"></div>
-    </form>
-    <section class="result" id="result" aria-live="polite">
-      <div class="hint">Your WhatsApp pairing code</div>
-      <div class="code" id="code"></div>
-      <button class="copy-btn" id="copyCode" type="button">COPY PAIRING CODE</button>
-      <div class="hint" id="copyHint" aria-live="polite"></div>
-      <div class="hint">On WhatsApp, open Linked devices → Link a device → Link with phone number, then enter this code. Keep the pairing code private. Your linked session is saved automatically.</div>
+  <div class="shell">
+    <header>
+      <div class="brand"><img class="mark" src="/castro-md-icon.png" alt="CASTRO-MD"><div><strong>CASTRO-MD</strong><small>WHATSAPP CONNECTION CENTRE</small></div></div>
+      <div class="secure">✦ SECURE PAIRING</div>
+    </header>
+    <section class="hero">
+      <div class="eyebrow">Your bot. Your control.</div>
+      <h1>Connect your <span style="color:var(--cyan)">WhatsApp</span></h1>
+      <p>Link your account to CASTRO-MD in a few simple steps. Your connection is stored securely and managed separately from other users.</p>
     </section>
-    <p class="foot">BLACK • GOLD • ELECTRIC BLUE<br>Powered by Castro</p>
-  </main>
+    <main class="layout">
+      <section class="card">
+        <h2>Start a new connection</h2>
+        <div class="muted">Enter your WhatsApp number in international format, including your country code.</div>
+        <form id="pairForm">
+          <label for="number">WHATSAPP PHONE NUMBER</label>
+          <input id="number" name="number" type="tel" inputmode="numeric" autocomplete="tel" placeholder="2547XXXXXXXX" required minlength="8" maxlength="15">
+          <button class="primary" id="submit" type="submit">GENERATE PAIRING CODE&nbsp; →</button>
+          <div class="error" id="error" role="alert"></div>
+        </form>
+        <section class="result" id="result" aria-live="polite">
+          <div class="result-label">YOUR ONE-TIME PAIRING CODE</div>
+          <div class="code" id="code"></div>
+          <button class="secondary" id="copyCode" type="button">COPY PAIRING CODE</button>
+          <div class="muted" id="copyHint" style="text-align:center;margin-top:8px" aria-live="polite"></div>
+          <div class="steps">
+            <div class="step"><span class="num">1</span><span>Open WhatsApp on the phone you want to connect.</span></div>
+            <div class="step"><span class="num">2</span><span>Go to <b>Linked devices → Link a device</b>.</span></div>
+            <div class="step"><span class="num">3</span><span>Choose <b>Link with phone number instead</b> and enter the code above.</span></div>
+          </div>
+          <div class="statusbox" id="statusBox">
+            <div class="statusline"><span class="dot" id="statusDot"></span><span id="statusTitle">Waiting for WhatsApp confirmation…</span></div>
+            <p class="statusdetail" id="statusDetail">Keep this page open. We'll check the connection automatically.</p>
+          </div>
+        </section>
+      </section>
+      <aside class="side">
+        <section class="card">
+          <h2>Connection benefits</h2>
+          <div class="feature"><div class="icon">⚡</div><div><b>Fast setup</b><span>Generate a pairing code and connect without copying session files.</span></div></div>
+          <div class="feature"><div class="icon">◉</div><div><b>Live connection check</b><span>See when WhatsApp confirms your account is connected.</span></div></div>
+          <div class="feature"><div class="icon">⌘</div><div><b>Your own bot account</b><span>Your bot settings and account are isolated from other users.</span></div></div>
+        </section>
+        <div class="notice"><b>Keep your code private.</b><br>Never share your pairing code with anyone. CASTRO-MD support will never ask you to send your code or session credentials.</div>
+        <section class="card"><h2>Need help?</h2><p class="muted" style="margin-bottom:0">If a code expires or pairing fails, wait briefly and request a fresh code. Make sure the WhatsApp number you enter is the same account you are linking.</p></section>
+      </aside>
+    </main>
+    <p class="foot">BLACK • GOLD • ELECTRIC BLUE &nbsp;|&nbsp; POWERED BY CASTRO</p>
+  </div>
   <script>
     if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
-    const form=document.getElementById('pairForm');
-    const button=document.getElementById('submit');
-    const error=document.getElementById('error');
-    const result=document.getElementById('result');
-    const copyButton=document.getElementById('copyCode');
-    const codeElement=document.getElementById('code');
-    const copyHint=document.getElementById('copyHint');
-    // Remove tracking parameters added by link-sharing platforms from the visible address.
-    const cleanUrl=new URL(window.location.href);
-    let cleaned=false;
-    for(const key of [...cleanUrl.searchParams.keys()]){
-      if(key.toLowerCase().startsWith('utm_')){cleanUrl.searchParams.delete(key);cleaned=true;}
-    }
+    const form=document.getElementById('pairForm'),button=document.getElementById('submit'),error=document.getElementById('error');
+    const result=document.getElementById('result'),codeElement=document.getElementById('code'),copyButton=document.getElementById('copyCode');
+    const copyHint=document.getElementById('copyHint'),statusBox=document.getElementById('statusBox'),statusDot=document.getElementById('statusDot');
+    const statusTitle=document.getElementById('statusTitle'),statusDetail=document.getElementById('statusDetail');
+    let pollTimer=null,activePairId=null;
+    const cleanUrl=new URL(window.location.href);let cleaned=false;
+    for(const key of [...cleanUrl.searchParams.keys()]){if(key.toLowerCase().startsWith('utm_')){cleanUrl.searchParams.delete(key);cleaned=true;}}
     if(cleaned)window.history.replaceState({},document.title,cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);
-    copyButton.addEventListener('click',async()=>{
-      const code=codeElement.textContent.trim();
-      if(!code)return;
+    function stopPolling(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
+    async function checkStatus(){
+      if(!activePairId)return;
       try{
-        if(navigator.clipboard&&window.isSecureContext){
-          await navigator.clipboard.writeText(code);
+        const response=await fetch('/api/pair-status?id='+encodeURIComponent(activePairId),{headers:{'Accept':'application/json'},cache:'no-store'});
+        if(!response.ok)return;
+        const data=await response.json();
+        if(data.status==='connected'){
+          stopPolling();statusDot.classList.add('live');statusTitle.textContent='WhatsApp connected successfully!';
+          statusDetail.textContent='Your CASTRO-MD account is online. Open WhatsApp and send .menu to get started.';
+        }else if(data.status==='disconnected'||data.status==='needs_pairing'){
+          stopPolling();statusTitle.textContent='Connection needs attention';statusDetail.textContent='The account is not connected. Request a fresh pairing code and try again.';
         }else{
-          const helper=document.createElement('textarea');
-          helper.value=code;helper.style.position='fixed';helper.style.opacity='0';
-          document.body.appendChild(helper);helper.select();
-          const copied=document.execCommand('copy');helper.remove();
-          if(!copied)throw new Error('Copy unavailable');
+          statusTitle.textContent='Waiting for WhatsApp confirmation…';
+          statusDetail.textContent='Your code has been generated. Complete the linking steps in WhatsApp; this page will update automatically.';
         }
-        copyButton.textContent='COPIED ✓';copyButton.classList.add('copied');
-        copyHint.textContent='Pairing code copied. Paste it into WhatsApp.';
-      }catch(_){
-        copyHint.textContent='Copy was blocked. Press and hold the code above to copy it.';
-      }
-      setTimeout(()=>{copyButton.textContent='COPY PAIRING CODE';copyButton.classList.remove('copied');},2200);
+      }catch(_){statusDetail.textContent='Connection check temporarily unavailable. We will keep trying.';}
+    }
+    copyButton.addEventListener('click',async()=>{
+      const code=codeElement.textContent.trim();if(!code)return;
+      try{
+        if(navigator.clipboard&&window.isSecureContext)await navigator.clipboard.writeText(code);
+        else{const helper=document.createElement('textarea');helper.value=code;helper.style.position='fixed';helper.style.opacity='0';document.body.appendChild(helper);helper.select();const copied=document.execCommand('copy');helper.remove();if(!copied)throw new Error('Copy unavailable');}
+        copyButton.textContent='COPIED ✓';copyHint.textContent='Copied. Enter it in WhatsApp to finish linking.';
+      }catch(_){copyHint.textContent='Copy was blocked. Press and hold the code to copy it.';}
+      setTimeout(()=>copyButton.textContent='COPY PAIRING CODE',2200);
     });
     form.addEventListener('submit',async event=>{
-      event.preventDefault();
+      event.preventDefault();stopPolling();activePairId=null;
       const number=document.getElementById('number').value.replace(/\D/g,'');
-      error.textContent='';result.style.display='none';
+      error.textContent='';result.style.display='none';statusBox.style.display='none';
       if(number.length<8||number.length>15){error.textContent='Enter a valid number with country code.';return;}
-      button.disabled=true;button.textContent='REQUESTING CODE…';
+      button.disabled=true;button.textContent='REQUESTING SECURE CODE…';
       try{
-        const response=await fetch('/api/pair?number='+encodeURIComponent(number),{
-          headers:{'Accept':'application/json'},
-          cache:'no-store'
-        });
-        const body=await response.text();
-        let data;
-        try{data=JSON.parse(body);}
-        catch(_){
-          const status=response.status;
-          if(status===502||status===503||status===504){
-            throw new Error('The pairing service is temporarily unavailable. Wait a minute and try again.');
-          }
-          throw new Error('The server returned an unexpected response. Please try again shortly.');
-        }
+        const response=await fetch('/api/pair?number='+encodeURIComponent(number),{headers:{'Accept':'application/json'},cache:'no-store'});
+        const body=await response.text();let data;
+        try{data=JSON.parse(body);}catch(_){throw new Error(response.status>=502?'The pairing service is temporarily unavailable. Try again shortly.':'The server returned an unexpected response.');}
         if(!response.ok)throw new Error(data.error||'Pairing request failed.');
-        if(!data||typeof data.code!=='string'||!data.code.trim()){
-          throw new Error('The pairing service did not return a code. Please try again.');
-        }
-        codeElement.textContent=data.code.trim();
-        copyButton.textContent='COPY PAIRING CODE';copyButton.classList.remove('copied');
-        copyHint.textContent='';
-        result.style.display='block';
+        if(typeof data.code!=='string'||!data.code.trim()||typeof data.pairingId!=='string')throw new Error('The service returned an incomplete pairing response. Please try again.');
+        codeElement.textContent=data.code.trim();activePairId=data.pairingId;
+        copyButton.textContent='COPY PAIRING CODE';copyHint.textContent='';result.style.display='block';statusBox.style.display='block';
+        statusDot.classList.remove('live');statusTitle.textContent='Waiting for WhatsApp confirmation…';
+        await checkStatus();pollTimer=setInterval(checkStatus,4000);
       }catch(err){error.textContent=err.message||'Could not reach the pairing service. Try again.';}
-      finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE';}
+      finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE →';}
     });
+    window.addEventListener('beforeunload',stopPolling);
   </script>
 </body>
 </html>

@@ -339,7 +339,7 @@ async function requestTenantPairing(phone) {
           log.error('Could not reset failed pairing state:', e.message);
         }
         reject(error);
-      } else resolve(code);
+      } else resolve({ code, pairingId: tenant.id });
     };
     const onMessage = (message) => {
       if (message?.tenantId !== tenant.id) return;
@@ -450,6 +450,21 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === '/api/pair-status' && req.method === 'GET') {
+      const id = String(url.searchParams.get('id') || '');
+      if (!/^[a-f0-9]{32}$/.test(id)) return json(res, 400, { error: 'Invalid pairing reference.' });
+      try {
+        const tenant = await (await getTenantRegistry()).get(id);
+        if (!tenant) return json(res, 404, { error: 'Pairing reference not found.' });
+        // The random pairing reference is an opaque, short-lived capability. Return status only:
+        // never expose the phone number, tenant record, session data, or authentication material.
+        return json(res, 200, { status: tenant.status });
+      } catch (e) {
+        log.error('Could not check pairing status:', e.message);
+        return json(res, 503, { error: 'Connection status is temporarily unavailable.' });
+      }
+    }
+
     if (url.pathname === '/api/pair') {
       const ip = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
       if (limited(ip)) return json(res, 429, { error: 'Too many attempts. Try again in a few minutes.' });
@@ -463,8 +478,8 @@ const server = http.createServer(async (req, res) => {
           return json(res, 429, { error: 'Wait one minute before requesting another code.' });
         }
         pairingRequests.set(number, Date.now());
-        const code = await requestTenantPairing(number);
-        return json(res, 200, { code });
+        const pairing = await requestTenantPairing(number);
+        return json(res, 200, pairing);
       } catch (e) {
         log.error('Tenant pairing request failed:', e.message);
         return json(res, 400, { error: e.message || 'Could not generate a pairing code.' });
