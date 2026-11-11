@@ -44,7 +44,7 @@
     .timer-copy b{display:block;font:12px ui-monospace,monospace;color:#b6c7d8;letter-spacing:.08em;margin-bottom:7px}.timer-copy p{margin:0;color:var(--muted);font-size:12px;line-height:1.5}
     .steps{display:grid;gap:11px;padding:17px 16px}.step{display:flex;gap:11px;align-items:flex-start;color:#c6d3e2;font-size:12px;line-height:1.55}.num{flex:0 0 23px;height:23px;border-radius:50%;display:grid;place-items:center;background:#17394a;color:var(--cyan);font-size:11px;font-weight:900}
     .statusbox{display:none;margin:0 15px 15px;border:1px solid #354b60;border-radius:13px;padding:13px;background:#0a121d}.statusline{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:750}.dot{width:8px;height:8px;border-radius:50%;background:var(--gold);box-shadow:0 0 12px currentColor}.dot.live{background:var(--green)}.statusdetail{color:var(--muted);font-size:11px;margin:7px 0 0 17px;line-height:1.5}
-    .account{display:none;margin:0 15px 15px;padding:15px;border:1px solid #287c68;border-radius:14px;background:#0d241f}.account h3{font-size:12px;letter-spacing:.1em;margin:0 0 12px;color:#a8f5d9}.account p{font-size:12px;color:#d2e8df;line-height:1.6;margin:5px 0}
+    .account{display:none;margin:0 15px 15px;padding:15px;border:1px solid #287c68;border-radius:14px;background:#0d241f}.account h3{font-size:12px;letter-spacing:.1em;margin:0 0 12px;color:#a8f5d9}.account p{font-size:12px;color:#d2e8df;line-height:1.6;margin:5px 0}.dashboard-link{display:inline-block;margin-top:10px;color:#9defff;font-size:12px;text-decoration:none}.resend{width:100%;margin-top:12px;padding:12px;border:1px solid #59b8d1;border-radius:12px;background:#102330;color:#b8f5ff;font-weight:750;cursor:pointer}.resend:disabled{opacity:.55}.resend-note{min-height:18px;margin-top:8px!important;color:#a7dbe6!important}
     .security{display:flex;gap:12px;align-items:center;margin-top:16px;padding:16px;border:1px solid #68552e;border-radius:15px;background:linear-gradient(110deg,#241d12,#171710);color:#e8d6b2;font-size:12px;line-height:1.5}.lock{width:38px;height:38px;flex:0 0 38px;border-radius:12px;display:grid;place-items:center;background:#4b3920;color:#ffd17a;font-size:19px}.security b{display:block;color:#ffe3aa;margin-bottom:3px}
     .benefits{margin-top:28px}.benefits h2{font-size:20px;font-weight:550;margin:0 0 15px}.feature-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.feature{min-height:130px;padding:15px 9px;border:1px solid #4b6071;border-radius:17px;background:linear-gradient(145deg,#1b2937,#101923);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;box-shadow:0 10px 25px #0005}.feature-icon{font-size:30px;margin-bottom:10px;filter:drop-shadow(0 0 10px #56dfff55)}.feature b{font-size:12px;font-weight:550;line-height:1.4}
     .help{margin-top:20px;border:1px solid #405264;border-radius:20px;background:linear-gradient(120deg,#17212d,#101720);padding:18px}.help h2{font-size:19px;margin:0 0 7px}.help p{font-size:12px;line-height:1.6;color:var(--muted);margin:0}
@@ -80,7 +80,7 @@
             <div class="step"><span class="num">3</span><span>Choose <b>Link with phone number instead</b> and enter the code above.</span></div>
           </div>
           <div class="statusbox" id="statusBox"><div class="statusline"><span class="dot" id="statusDot"></span><span id="statusTitle">Waiting for WhatsApp confirmation…</span></div><p class="statusdetail" id="statusDetail">Complete the linking steps in WhatsApp; this page checks automatically.</p></div>
-          <div class="account" id="accountBox"><h3>✓ YOUR CASTRO-MD ACCOUNT</h3><p><b>Connection:</b> <span id="accountStatus">Connected</span></p><p><b>Connected since:</b> <span id="connectedSince">—</span></p><p><b>Last connection check:</b> <span id="lastSeen">—</span></p><p>Open WhatsApp and send <b>.menu</b> to your CASTRO-MD bot to get started.</p></div>
+          <div class="account" id="accountBox"><h3>✓ YOUR CASTRO-MD ACCOUNT</h3><p><b>Connection:</b> <span id="accountStatus">Connected</span></p><p><b>Connected since:</b> <span id="connectedSince">—</span></p><p><b>Last connection check:</b> <span id="lastSeen">—</span></p><p>Open WhatsApp and send <b>.menu</b> to your CASTRO-MD bot to get started.</p><a class="dashboard-link" href="/dashboard">Open customer dashboard →</a><button class="resend" id="resendDashboard" type="button">SEND DASHBOARD VERIFICATION TO WHATSAPP</button><p class="resend-note" id="resendNote" role="status"></p></div>
         </section>
       </section>
       <div class="security"><div class="lock">▣</div><div><b>KEEP YOUR CODE PRIVATE.</b>Never share your pairing code or session credentials. CASTRO-MD support will never ask for them.</div></div>
@@ -124,6 +124,18 @@
         }
       }catch(_){statusDetail.textContent='Connection check temporarily unavailable. We will keep trying.';}
     }
+    const resendButton=document.getElementById('resendDashboard'),resendNote=document.getElementById('resendNote');
+    resendButton.addEventListener('click',async()=>{
+      if(!activePairId){resendNote.textContent='Use the pairing page where this account was connected.';return;}
+      resendButton.disabled=true;resendButton.textContent='SENDING…';resendNote.textContent='';
+      try{
+        const response=await fetch('/api/dashboard/resend',{method:'POST',headers:{'Content-Type':'application/json','Accept':'application/json'},cache:'no-store',body:JSON.stringify({pairingId:activePairId})});
+        const data=await response.json();
+        if(!response.ok)throw new Error(data.error||'Could not send verification message.');
+        resendNote.textContent='✓ Check the WhatsApp account you just connected. The code expires in 10 minutes.';
+      }catch(error){resendNote.textContent=error.message||'Could not send verification message.';}
+      finally{resendButton.disabled=false;resendButton.textContent='SEND DASHBOARD VERIFICATION TO WHATSAPP';}
+    });
     copyButton.addEventListener('click',async()=>{
       const code=codeElement.textContent.trim();if(!code)return;
       try{
