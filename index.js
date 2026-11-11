@@ -526,6 +526,43 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (url.pathname === '/api/dashboard/resend' && req.method === 'POST') {
+      const origin = String(req.headers.origin || '');
+      try {
+        if (!origin || new URL(origin).host !== String(req.headers.host || '')) return json(res, 403, { error: 'Request origin could not be verified.' });
+      } catch {
+        return json(res, 403, { error: 'Request origin could not be verified.' });
+      }
+      const requestIp = (req.headers['x-forwarded-for'] || req.socket.remoteAddress || '').split(',')[0].trim();
+      if (limited(requestIp)) return json(res, 429, { error: 'Too many requests. Wait a few minutes and try again.' });
+      try {
+        let raw = '';
+        for await (const chunk of req) {
+          raw += chunk;
+          if (raw.length > 2048) return json(res, 413, { error: 'Request too large.' });
+        }
+        const body = JSON.parse(raw || '{}');
+        const id = String(body.pairingId || '');
+        if (!/^[a-f0-9]{32}$/.test(id)) return json(res, 400, { error: 'Open the pairing page used for this WhatsApp account and try again.' });
+        const worker = tenantWorkers.get(id);
+        if (!worker || worker.exitCode !== null || worker.killed || worker.signalCode !== null) {
+          return json(res, 409, { error: 'Your bot is not currently online. Reconnect it before requesting dashboard access.' });
+        }
+        const crypto = require('crypto');
+        const token = crypto.randomBytes(32).toString('hex');
+        const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+        const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+        const registry = await getTenantRegistry();
+        const issued = await registry.requestDashboardClaim(id, tokenHash, expiresAt);
+        if (!issued) return json(res, 429, { error: 'A verification code was sent recently, or this account is not connected. Check WhatsApp or wait one minute before trying again.' });
+        worker.send({ type: 'dashboard-claim', tenantId: id, token });
+        return json(res, 200, { ok: true, message: 'A new one-time verification code has been sent to the WhatsApp account connected to this pairing session.' });
+      } catch (e) {
+        log.warn('Dashboard verification resend could not be completed:', e.message);
+        return json(res, 503, { error: 'Could not send a verification code right now. Please try again shortly.' });
+      }
+    }
+
     if (url.pathname === '/api/dashboard/settings' && req.method === 'PATCH') {
       const origin = String(req.headers.origin || '');
       const host = String(req.headers.host || '');
