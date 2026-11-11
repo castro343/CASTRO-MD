@@ -529,7 +529,11 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/api/dashboard/settings' && req.method === 'PATCH') {
       const origin = String(req.headers.origin || '');
       const host = String(req.headers.host || '');
-      if (!origin || new URL(origin).host !== host) return json(res, 403, { error: 'Request origin could not be verified.' });
+      try {
+        if (!origin || new URL(origin).host !== host) return json(res, 403, { error: 'Request origin could not be verified.' });
+      } catch {
+        return json(res, 403, { error: 'Request origin could not be verified.' });
+      }
       try {
         const cookieHeader = String(req.headers.cookie || '');
         const rawToken = cookieHeader.split(';').map((part) => part.trim()).find((part) => part.startsWith('castro_dashboard='))?.slice('castro_dashboard='.length) || '';
@@ -1053,7 +1057,7 @@ if (tenantId) {
     if (message.type === 'settings-update' && message.settings && tenantId) {
       const next = message.settings;
       if (typeof next.botName === 'string' && /^[A-Za-z0-9 _-]{2,32}$/.test(next.botName)) settings.botName = next.botName;
-      if (typeof next.prefix === 'string' && /^[^\\s]{1,3}$/.test(next.prefix)) settings.prefix = next.prefix;
+      if (typeof next.prefix === 'string' && /^[^\s]{1,3}$/.test(next.prefix)) settings.prefix = next.prefix;
       if (typeof next.autoRead === 'boolean') settings.autoRead = next.autoRead;
       if (typeof next.autoViewStatus === 'boolean') settings.autoViewStatus = next.autoViewStatus;
       if (typeof next.statusReact === 'boolean') settings.statusReact = next.statusReact;
