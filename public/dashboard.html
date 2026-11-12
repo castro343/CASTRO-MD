@@ -23,9 +23,9 @@ a{color:var(--cyan)}button,input{font:inherit}.shell{width:min(100%,760px);margi
 <div class="settings-grid">
 <div class="setting"><label for="botNameInput">Bot display name</label><small>The name shown by your bot in supported messages.</small><input id="botNameInput" type="text" maxlength="32" minlength="2" autocomplete="off" placeholder="CASTRO-MD"></div>
 <div class="setting"><label for="prefixInput">Command prefix</label><small>The symbol users type before commands.</small><input id="prefixInput" type="text" maxlength="3" autocomplete="off" placeholder="."></div>
-<label class="setting toggle"><span><label for="autoRead">Auto-read messages</label><small>Automatically mark incoming chats as read.</small></span><input id="autoRead" type="checkbox"></label>
-<label class="setting toggle"><span><label for="autoViewStatus">Auto-view statuses</label><small>Automatically view new WhatsApp statuses.</small></span><input id="autoViewStatus" type="checkbox"></label>
-<label class="setting toggle full"><span><label for="statusReact">Status reactions</label><small>React to eligible new statuses using the bot's configured reactions.</small></span><input id="statusReact" type="checkbox"></label>
+<div class="setting toggle"><span><label for="autoRead">Auto-read messages</label><small>Automatically mark incoming chats as read.</small></span><input id="autoRead" type="checkbox"></div>
+<div class="setting toggle"><span><label for="autoViewStatus">Auto-view statuses</label><small>Automatically view new WhatsApp statuses.</small></span><input id="autoViewStatus" type="checkbox"></div>
+<div class="setting toggle full"><span><label for="statusReact">Status reactions</label><small>React to eligible new statuses using the bot's configured reactions.</small></span><input id="statusReact" type="checkbox"></div>
 </div><div class="save-row"><button class="primary" id="saveSettings" type="button">SAVE PREFERENCES →</button><span class="saved" id="saveMessage" role="status"></span></div>
 <div class="hint">Changes are saved to your account. They are sent to your bot when its worker is online; reconnecting may be needed if the bot is offline.</div>
 </section><footer class="foot">BLACK • GOLD • ELECTRIC BLUE &nbsp;|&nbsp; POWERED BY CASTRO</footer></main>
