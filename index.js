@@ -59,6 +59,7 @@ if (settings.sessionId && !fs.existsSync(path.join(settings.sessionDir, 'creds.j
 const hits = new Map(); // ip -> [timestamps] for a simple rate limit on pairing requests
 const pairingRequests = new Map(); // phone -> last request time
 const tenantPairingQrs = new Map(); // tenant id -> short-lived WhatsApp QR payload
+const tenantPairingCodes = new Map(); // tenant id -> short-lived formatted pairing code
 const QR_TTL_MS = 2 * 60 * 1000;
 const limited = (ip) => {
   const now = Date.now();
@@ -255,8 +256,12 @@ function launchTenant(tenant, pairingNumber = '') {
     if (message.type === 'pairing-qr' && typeof message.qr === 'string' && message.qr.length < 4096) {
       tenantPairingQrs.set(tenant.id, { value: message.qr, expiresAt: Date.now() + QR_TTL_MS });
     }
+    if (message.type === 'pairing-code' && typeof message.code === 'string' && /^[A-Z0-9-]{4,20}$/.test(message.code)) {
+      tenantPairingCodes.set(tenant.id, { value: message.code, expiresAt: Date.now() + QR_TTL_MS });
+    }
     if (message.type === 'connected') {
       tenantPairingQrs.delete(tenant.id);
+      tenantPairingCodes.delete(tenant.id);
       tenantRestartAttempts.delete(tenant.id);
       const pending = tenantRestartTimers.get(tenant.id);
       if (pending) clearTimeout(pending);
@@ -299,6 +304,7 @@ function launchTenant(tenant, pairingNumber = '') {
   child.on('exit', async (code) => {
     if (tenantWorkers.get(tenant.id) === child) tenantWorkers.delete(tenant.id);
     tenantPairingQrs.delete(tenant.id);
+    tenantPairingCodes.delete(tenant.id);
     try { await (await getTenantRegistry()).markDisconnected(tenant.id); } catch {}
     log.warn(`Tenant bot ${tenant.id} worker exited (${code}).`);
     // Recover previously linked accounts after an unexpected worker crash.
@@ -339,7 +345,7 @@ async function requestTenantPairing(phone) {
   if (tenant.status === 'disabled') throw new Error('This bot account is disabled. Contact the platform owner.');
   if (tenant.status === 'connected') throw new Error('This WhatsApp number already has a CASTRO-MD account.');
   if (tenantWorkers.has(tenant.id)) throw new Error('A pairing request is already active for this number. Wait a moment and try again.');
-  const child = launchTenant(tenant, '');
+  const child = launchTenant(tenant, tenant.phone);
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => finish(new Error('Pairing service timed out. Please try again.')), 25000);
@@ -497,6 +503,17 @@ const server = http.createServer(async (req, res) => {
         log.error('Could not render tenant pairing QR:', e.message);
         return json(res, 503, { error: 'Could not render the pairing QR. Please try again.' });
       }
+    }
+
+    if (url.pathname === '/api/pair-code' && req.method === 'GET') {
+      const id = String(url.searchParams.get('id') || '');
+      if (!/^[a-f0-9]{32}$/.test(id)) return json(res, 400, { error: 'Invalid pairing reference.' });
+      const entry = tenantPairingCodes.get(id);
+      if (!entry || entry.expiresAt <= Date.now()) {
+        tenantPairingCodes.delete(id);
+        return json(res, 404, { error: 'Pairing code is not ready or has expired.' });
+      }
+      return json(res, 200, { code: entry.value, expiresAt: new Date(entry.expiresAt).toISOString() });
     }
 
     if (url.pathname === '/api/pair-status' && req.method === 'GET') {
@@ -849,7 +866,7 @@ async function start() {
   });
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
-    if (qr && !settings.pairingNumber) {
+    if (qr) {
       if (tenantId && process.send) {
         try { process.send({ type: 'pairing-qr', tenantId, qr }); } catch {}
       } else {

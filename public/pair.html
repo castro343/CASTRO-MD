@@ -37,6 +37,7 @@
     .result{display:none;margin-top:20px;border:1px solid #52677b;border-radius:20px;overflow:hidden;background:linear-gradient(145deg,#101c2a,#0a111b);box-shadow:0 12px 35px #0007}
     .result-head{display:flex;justify-content:space-between;align-items:center;padding:13px 16px;background:#ffffff0a;color:#c5d1dc;font:12px ui-monospace,monospace;letter-spacing:.08em}
     .code-row{display:flex;align-items:center;gap:10px;padding:14px 15px 17px}.code{flex:1;min-width:0;font:900 clamp(25px,7vw,37px)/1.2 ui-monospace,monospace;letter-spacing:.08em;color:#f3f7fb;overflow-wrap:anywhere}
+    .pair-code-panel{padding:16px;border-top:1px solid #344456;background:#0c1622}.pair-code-label{font:11px ui-monospace,monospace;letter-spacing:.12em;color:#9fb2c4;margin-bottom:9px}.pair-code-row{display:flex;align-items:center;gap:10px}.pair-code{flex:1;min-width:0;font:900 clamp(24px,7vw,34px)/1.2 ui-monospace,monospace;letter-spacing:.1em;color:#f7dfad;overflow-wrap:anywhere}.pair-code-note{font-size:11px;color:#91a4b7;margin:8px 0 0;line-height:1.5}
     .copy{border:1px solid #546779;background:#152333;color:#d9e8f6;border-radius:11px;padding:10px 12px;font-size:12px;cursor:pointer}
     .timer-area{display:grid;grid-template-columns:108px 1fr;gap:15px;align-items:center;padding:15px;border-top:1px solid #344456;background:#0b131e}
     .timer{width:100px;height:100px;border-radius:50%;display:grid;place-content:center;text-align:center;border:5px solid #304253;border-top-color:var(--cyan);border-right-color:#50c7f5;box-shadow:0 0 17px #51dfff21}
@@ -73,7 +74,8 @@
         <section class="result" id="result" aria-live="polite">
           <div class="result-head"><span>WHATSAPP QR READY</span><span>SCAN TO CONNECT</span></div>
           <div style="display:grid;place-items:center;padding:22px 14px 12px;background:#fff"><img id="pairQr" alt="WhatsApp device-linking QR code" width="280" height="280" style="display:block;width:min(100%,280px);height:auto;image-rendering:pixelated" /></div>
-          <div style="padding:12px 16px 17px;text-align:center"><b style="display:block;color:#dffaff;font-size:14px">Scan with WhatsApp</b><p style="margin:7px 0 0;color:#b6c7d8;font-size:12px;line-height:1.55">Open WhatsApp → Linked devices → Link a device, then scan this QR code. Keep this page open until connected.</p><p id="qrExpiry" style="color:#91a4b7;font-size:11px;margin:8px 0 0">Preparing secure QR…</p></div>
+          <div style="padding:12px 16px 17px;text-align:center"><b style="display:block;color:#dffaff;font-size:14px">Scan with WhatsApp</b><p style="margin:7px 0 0;color:#b6c7d8;font-size:12px;line-height:1.55">Open WhatsApp → Linked devices → Link a device, then scan this QR code.</p><p id="qrExpiry" style="color:#91a4b7;font-size:11px;margin:8px 0 0">Preparing secure QR…</p></div>
+          <div class="pair-code-panel"><div class="pair-code-label">OR LINK WITH PHONE NUMBER</div><div class="pair-code-row"><div class="pair-code" id="pairingCode">••••-••••</div><button class="copy" id="copyPairingCode" type="button" disabled>COPY CODE</button></div><p class="pair-code-note" id="pairCodeNote">Your 8-character WhatsApp pairing code will appear here. In WhatsApp, choose Linked devices → Link with phone number instead of scanning.</p></div>
           <div class="statusbox" id="statusBox"><div class="statusline"><span class="dot" id="statusDot"></span><span id="statusTitle">Waiting for WhatsApp confirmation…</span></div><p class="statusdetail" id="statusDetail">Complete the linking steps in WhatsApp; this page checks automatically.</p></div>
           <div class="account" id="accountBox"><h3>✓ YOUR CASTRO-MD ACCOUNT</h3><p><b>Connection:</b> <span id="accountStatus">Connected</span></p><p><b>Connected since:</b> <span id="connectedSince">—</span></p><p><b>Last connection check:</b> <span id="lastSeen">—</span></p><p>Open WhatsApp and send <b>.menu</b> to your CASTRO-MD bot to get started.</p><a class="dashboard-link" href="/dashboard">Open customer dashboard →</a><button class="resend" id="resendDashboard" type="button">SEND DASHBOARD VERIFICATION TO WHATSAPP</button><p class="resend-note" id="resendNote" role="status"></p></div>
         </section>
@@ -84,7 +86,7 @@
         <div class="feature"><div class="feature-icon">◉</div><b>Live connection<br>check</b></div>
         <div class="feature"><div class="feature-icon">⬡</div><b>Your own<br>bot account</b></div>
       </div></section>
-      <section class="help"><h2>Need help?</h2><p>If a code expires or pairing fails, request a fresh code. Make sure the number entered is the same WhatsApp account you are linking.</p></section>
+      <section class="help"><h2>Need help?</h2><p>Use either method: scan the QR code, or copy the pairing code and enter it in WhatsApp under Linked devices → Link with phone number. Both options connect the same account.</p></section>
     </main>
     <p class="foot">BLACK • GOLD • ELECTRIC BLUE &nbsp;|&nbsp; POWERED BY CASTRO</p>
   </div>
@@ -92,14 +94,18 @@
     if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}
     const form=document.getElementById('pairForm'),button=document.getElementById('submit'),error=document.getElementById('error');
     const result=document.getElementById('result'),pairQr=document.getElementById('pairQr'),qrExpiry=document.getElementById('qrExpiry');
+    const pairingCode=document.getElementById('pairingCode'),copyPairingCode=document.getElementById('copyPairingCode'),pairCodeNote=document.getElementById('pairCodeNote');
     const statusBox=document.getElementById('statusBox'),statusDot=document.getElementById('statusDot');
     const statusTitle=document.getElementById('statusTitle'),statusDetail=document.getElementById('statusDetail');
     const accountBox=document.getElementById('accountBox'),connectedSince=document.getElementById('connectedSince'),lastSeen=document.getElementById('lastSeen');
     
     const dateLabel=value=>value?new Date(value).toLocaleString(undefined,{dateStyle:'medium',timeStyle:'short'}):'Not available';
-    let pollTimer=null,qrTimer=null,activePairId=null;
+    let pollTimer=null,qrTimer=null,codeTimer=null,activePairId=null;
     function stopPolling(){if(pollTimer){clearInterval(pollTimer);pollTimer=null;}}
     function stopQrPolling(){if(qrTimer){clearInterval(qrTimer);qrTimer=null;}}
+    function stopCodePolling(){if(codeTimer){clearInterval(codeTimer);codeTimer=null;}}
+    async function refreshPairingCode(){if(!activePairId)return;try{const r=await fetch('/api/pair-code?id='+encodeURIComponent(activePairId),{headers:{'Accept':'application/json'},cache:'no-store'});if(!r.ok){const d=await r.json().catch(()=>({}));pairCodeNote.textContent=d.error||'Preparing your copyable pairing code…';return;}const d=await r.json();if(d.code){pairingCode.textContent=d.code;copyPairingCode.disabled=false;pairCodeNote.textContent='In WhatsApp, choose Linked devices → Link with phone number, then enter this code. It expires shortly.';}}catch(_){pairCodeNote.textContent='Pairing code temporarily unavailable. Retrying…';}}
+    copyPairingCode.addEventListener('click',async()=>{const code=pairingCode.textContent.trim();if(!code||code.includes('•'))return;try{await navigator.clipboard.writeText(code);copyPairingCode.textContent='COPIED ✓';setTimeout(()=>copyPairingCode.textContent='COPY CODE',1600);}catch(_){pairCodeNote.textContent='Select and copy the code manually: '+code;}});
     async function refreshQr(){if(!activePairId)return;try{const r=await fetch('/api/pair-qr?id='+encodeURIComponent(activePairId),{headers:{'Accept':'application/json'},cache:'no-store'});if(!r.ok){const d=await r.json().catch(()=>({}));qrExpiry.textContent=d.error||'Preparing QR code…';return;}const d=await r.json();if(d.qr&&pairQr.src!==d.qr)pairQr.src=d.qr;qrExpiry.textContent='QR refreshes automatically while you wait.';}catch(_){qrExpiry.textContent='QR temporarily unavailable. Retrying…';}}
     async function checkStatus(){
       if(!activePairId)return;
@@ -108,7 +114,7 @@
         if(!response.ok)return;
         const data=await response.json();
         if(data.status==='connected'){
-          stopPolling();stopQrPolling();statusDot.classList.add('live');statusTitle.textContent='WhatsApp connected successfully!';
+          stopPolling();stopQrPolling();stopCodePolling();statusDot.classList.add('live');statusTitle.textContent='WhatsApp connected successfully!';
           statusDetail.textContent='Your CASTRO-MD account is online. Send .menu in WhatsApp to get started.';
           accountBox.style.display='block';connectedSince.textContent=dateLabel(data.connectedAt);lastSeen.textContent=dateLabel(data.lastSeenAt);
         }else if(data.status==='disconnected'||data.status==='needs_pairing'){
@@ -132,9 +138,9 @@
       finally{resendButton.disabled=false;resendButton.textContent='SEND DASHBOARD VERIFICATION TO WHATSAPP';}
     });
     form.addEventListener('submit',async event=>{
-      event.preventDefault();stopPolling();stopQrPolling();activePairId=null;
+      event.preventDefault();stopPolling();stopQrPolling();stopCodePolling();activePairId=null;
       const number=document.getElementById('number').value.replace(/\D/g,'');
-      error.textContent='';result.style.display='none';statusBox.style.display='none';accountBox.style.display='none';
+      error.textContent='';result.style.display='none';statusBox.style.display='none';accountBox.style.display='none';pairingCode.textContent='••••-••••';copyPairingCode.disabled=true;copyPairingCode.textContent='COPY CODE';pairCodeNote.textContent='Your WhatsApp pairing code will appear here.';
       if(number.length<8||number.length>15){error.textContent='Enter a valid number with country code.';return;}
       button.disabled=true;button.textContent='REQUESTING SECURE CODE…';
       try{
@@ -145,12 +151,12 @@
         if(typeof data.pairingId!=='string')throw new Error('The service returned an incomplete pairing response. Please try again.');
         activePairId=data.pairingId;result.style.display='block';statusBox.style.display='block';pairQr.removeAttribute('src');
         statusDot.classList.remove('live');statusTitle.textContent='Waiting for WhatsApp confirmation…';
-        await refreshQr();qrTimer=setInterval(refreshQr,3000);
+        await Promise.all([refreshQr(),refreshPairingCode()]);qrTimer=setInterval(refreshQr,3000);codeTimer=setInterval(refreshPairingCode,3000);
         await checkStatus();pollTimer=setInterval(checkStatus,4000);
       }catch(err){error.textContent=err.message||'Could not reach the pairing service. Try again.';}
-      finally{button.disabled=false;button.textContent='GENERATE PAIRING CODE → ◉';}
+      finally{button.disabled=false;button.textContent='GENERATE QR + PAIRING CODE → ◉';}
     });
-    window.addEventListener('beforeunload',()=>{stopPolling();stopQrPolling();});
+    window.addEventListener('beforeunload',()=>{stopPolling();stopQrPolling();stopCodePolling();});
   </script>
 </body>
 </html>
