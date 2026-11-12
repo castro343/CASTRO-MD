@@ -58,6 +58,8 @@ if (settings.sessionId && !fs.existsSync(path.join(settings.sessionDir, 'creds.j
 // Tiny web server so hosts like Render/Heroku see an open port and keep the service alive.
 const hits = new Map(); // ip -> [timestamps] for a simple rate limit on pairing requests
 const pairingRequests = new Map(); // phone -> last request time
+const tenantPairingQrs = new Map(); // tenant id -> short-lived WhatsApp QR payload
+const QR_TTL_MS = 2 * 60 * 1000;
 const limited = (ip) => {
   const now = Date.now();
   const list = (hits.get(ip) || []).filter((t) => now - t < 10 * 60 * 1000);
@@ -250,7 +252,11 @@ function launchTenant(tenant, pairingNumber = '') {
   tenantWorkers.set(tenant.id, child);
   child.on('message', async (message) => {
     if (!message || message.tenantId !== tenant.id) return;
+    if (message.type === 'pairing-qr' && typeof message.qr === 'string' && message.qr.length < 4096) {
+      tenantPairingQrs.set(tenant.id, { value: message.qr, expiresAt: Date.now() + QR_TTL_MS });
+    }
     if (message.type === 'connected') {
+      tenantPairingQrs.delete(tenant.id);
       tenantRestartAttempts.delete(tenant.id);
       const pending = tenantRestartTimers.get(tenant.id);
       if (pending) clearTimeout(pending);
@@ -292,6 +298,7 @@ function launchTenant(tenant, pairingNumber = '') {
   });
   child.on('exit', async (code) => {
     if (tenantWorkers.get(tenant.id) === child) tenantWorkers.delete(tenant.id);
+    tenantPairingQrs.delete(tenant.id);
     try { await (await getTenantRegistry()).markDisconnected(tenant.id); } catch {}
     log.warn(`Tenant bot ${tenant.id} worker exited (${code}).`);
     // Recover previously linked accounts after an unexpected worker crash.
@@ -332,7 +339,7 @@ async function requestTenantPairing(phone) {
   if (tenant.status === 'disabled') throw new Error('This bot account is disabled. Contact the platform owner.');
   if (tenant.status === 'connected') throw new Error('This WhatsApp number already has a CASTRO-MD account.');
   if (tenantWorkers.has(tenant.id)) throw new Error('A pairing request is already active for this number. Wait a moment and try again.');
-  const child = launchTenant(tenant, phone);
+  const child = launchTenant(tenant, '');
   return new Promise((resolve, reject) => {
     let settled = false;
     const timer = setTimeout(() => finish(new Error('Pairing service timed out. Please try again.')), 25000);
@@ -352,11 +359,11 @@ async function requestTenantPairing(phone) {
           log.error('Could not reset failed pairing state:', e.message);
         }
         reject(error);
-      } else resolve({ code, pairingId: tenant.id });
+      } else resolve({ pairingId: tenant.id, method: 'qr' });
     };
     const onMessage = (message) => {
       if (message?.tenantId !== tenant.id) return;
-      if (message.type === 'pairing-code') finish(null, message.code);
+      if (message.type === 'pairing-qr') finish(null, true);
       if (message.type === 'pairing-error') finish(new Error(message.error || 'WhatsApp rejected the pairing request.'));
     };
     const onExit = () => finish(new Error('The bot worker stopped before generating a pairing code.'));
@@ -471,6 +478,24 @@ const server = http.createServer(async (req, res) => {
       } catch (e) {
         log.error('Could not load public pairing statistics:', e.message);
         return json(res, 503, { error: 'Pairing statistics are temporarily unavailable.' });
+      }
+    }
+
+    if (url.pathname === '/api/pair-qr' && req.method === 'GET') {
+      const id = String(url.searchParams.get('id') || '');
+      if (!/^[a-f0-9]{32}$/.test(id)) return json(res, 400, { error: 'Invalid pairing reference.' });
+      const entry = tenantPairingQrs.get(id);
+      if (!entry || entry.expiresAt <= Date.now()) {
+        tenantPairingQrs.delete(id);
+        return json(res, 404, { error: 'QR code is not ready or has expired. Generate a fresh pairing QR.' });
+      }
+      try {
+        const qrCode = require('qrcode');
+        const dataUrl = await qrCode.toDataURL(entry.value, { errorCorrectionLevel: 'M', margin: 2, width: 320, color: { dark: '#07111b', light: '#ffffff' } });
+        return json(res, 200, { qr: dataUrl, expiresAt: new Date(entry.expiresAt).toISOString() });
+      } catch (e) {
+        log.error('Could not render tenant pairing QR:', e.message);
+        return json(res, 503, { error: 'Could not render the pairing QR. Please try again.' });
       }
     }
 
@@ -825,8 +850,12 @@ async function start() {
 
   sock.ev.on('connection.update', async ({ connection, lastDisconnect, qr }) => {
     if (qr && !settings.pairingNumber) {
-      log.info('Scan this QR with WhatsApp > Linked devices:');
-      qrcode.generate(qr, { small: true });
+      if (tenantId && process.send) {
+        try { process.send({ type: 'pairing-qr', tenantId, qr }); } catch {}
+      } else {
+        log.info('Scan this QR with WhatsApp > Linked devices:');
+        qrcode.generate(qr, { small: true });
+      }
     }
     if (connection === 'open') {
       if (activeSocket === sock) activeSocketReady = true;
